@@ -1,73 +1,112 @@
-# Welcome to your Lovable project
+Bienvenido al proyecto PomiABSPro
+Información del proyecto
 
-## Project info
+URL:
+https://lovable.dev/projects/REEMPLAZAR_CON_ID_DEL_PROYECTO
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+PomiABSPro es una aplicación desarrollada y gestionada a través de Lovable.dev, lo que permite iterar, desplegar y mantener el proyecto de forma ágil y centralizada.
 
-## How can I edit this code?
+¿Cómo puedo editar este código?
 
-There are several ways of editing your application.
+Existen varias formas de editar y mantener la aplicación PomiABSPro.
 
-**Use Lovable**
+Usar Lovable.dev (recomendado)
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+Accede directamente al proyecto en Lovable:
+https://lovable.dev/projects/REEMPLAZAR_CON_ID_DEL_PROYECTO
 
-Changes made via Lovable will be committed automatically to this repo.
+Realiza cambios mediante prompts o edición visual.
 
-**Use your preferred IDE**
+Los cambios realizados en Lovable se guardan y versionan automáticamente en este repositorio.
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+Ideal para iteraciones rápidas y trabajo continuo sin fricción.
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+Usar tu IDE preferido (trabajo local)
 
-Follow these steps:
+Si prefieres trabajar localmente con tu propio entorno de desarrollo:
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+Requisitos
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+Node.js
 
-# Step 3: Install the necessary dependencies.
-npm i
+npm
+(Recomendado: instalar Node usando nvm
+https://github.com/nvm-sh/nvm#installing-and-updating
+)
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+Pasos
+
+# Paso 1: Clonar el repositorio
+git clone <URL_DE_TU_REPOSITORIO>
+
+# Paso 2: Entrar al directorio del proyecto
+cd <NOMBRE_DEL_PROYECTO>
+
+# Paso 3: Instalar dependencias
+npm install
+
+# Paso 4: Iniciar el servidor de desarrollo
 npm run dev
-```
 
-**Edit a file directly in GitHub**
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+Los cambios que subas al repositorio se reflejarán automáticamente en Lovable.dev.
 
-**Use GitHub Codespaces**
+Editar archivos directamente en GitHub
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+Navega al archivo que deseas modificar.
 
-## What technologies are used for this project?
+Haz clic en el botón Editar (icono de lápiz).
 
-This project is built with:
+Realiza los cambios necesarios.
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+Guarda y confirma (commit) los cambios.
 
-## How can I deploy this project?
+Útil para ajustes rápidos o correcciones menores.
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+Usar GitHub Codespaces
 
-## Can I connect a custom domain to my Lovable project?
+Ve a la página principal del repositorio.
 
-Yes, you can!
+Haz clic en Code (botón verde).
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+Selecciona la pestaña Codespaces.
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+Haz clic en New codespace.
+
+Edita el proyecto desde el navegador y sube los cambios cuando termines.
+
+¿Qué tecnologías utiliza PomiABSPro?
+
+Este proyecto está construido con tecnologías modernas enfocadas en rendimiento y escalabilidad:
+
+Vite
+
+TypeScript
+
+React
+
+shadcn/ui
+
+Tailwind CSS
+
+¿Cómo puedo desplegar el proyecto?
+
+Abre el proyecto en Lovable.dev:
+https://lovable.dev/projects/REEMPLAZAR_CON_ID_DEL_PROYECTO
+
+Haz clic en Share → Publish.
+
+El despliegue es inmediato y gestionado por Lovable.
+
+¿Puedo conectar un dominio personalizado?
+
+Sí, es totalmente posible.
+
+Ve a Project → Settings → Domains.
+
+Selecciona Connect Domain.
+
+Sigue las instrucciones para vincular tu dominio.
+
+Documentación oficial:
+https://docs.lovable.dev/features/custom-domain#custom-domain
