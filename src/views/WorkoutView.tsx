@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
 import { exercises } from '@/lib/exercises';
-import { X, Play, Pause, SkipForward, Check } from 'lucide-react';
+import { X, Play, Pause, SkipForward, Check, Volume2, VolumeX } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useVoiceCoach } from '@/hooks/useVoiceCoach';
 
 interface WorkoutViewProps {
   onClose: () => void;
@@ -11,7 +12,17 @@ interface WorkoutViewProps {
 
 const WorkoutView = ({ onClose }: WorkoutViewProps) => {
   const { state, t, addSession, addReps, language } = useApp();
-  const { preferences } = state.profile;
+  const { profile } = state;
+  const { preferences, voiceCoachEnabled, name: userName } = profile;
+
+  const voiceCoach = useVoiceCoach({
+    language,
+    enabled: voiceCoachEnabled,
+    userName: userName || undefined,
+  });
+
+  const hasAnnouncedStart = useRef(false);
+  const motivationalIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Filter exercises based on user preferences
   const availableExercises = exercises.filter(e =>
@@ -35,6 +46,39 @@ const WorkoutView = ({ onClose }: WorkoutViewProps) => {
 
   const currentExercise = workoutExercises[currentIndex];
 
+  // Announce first exercise on mount
+  useEffect(() => {
+    if (!hasAnnouncedStart.current && currentExercise && voiceCoachEnabled) {
+      hasAnnouncedStart.current = true;
+      const exerciseName = language === 'es' ? currentExercise.nameEs : currentExercise.name;
+      setTimeout(() => {
+        voiceCoach.announceStart(exerciseName, currentExercise.reps, currentExercise.sets);
+      }, 500);
+    }
+  }, [currentExercise, voiceCoach, voiceCoachEnabled, language]);
+
+  // Motivational phrases every 5 seconds during active exercise
+  useEffect(() => {
+    if (!isResting && !isPaused && voiceCoachEnabled) {
+      // Start motivational loop after 5 seconds
+      motivationalIntervalRef.current = setInterval(() => {
+        voiceCoach.startMotivationalLoop(5);
+      }, 5000);
+
+      // Actually start the loop
+      voiceCoach.startMotivationalLoop(5);
+    } else {
+      voiceCoach.stopMotivationalLoop();
+    }
+
+    return () => {
+      if (motivationalIntervalRef.current) {
+        clearInterval(motivationalIntervalRef.current);
+      }
+      voiceCoach.stopMotivationalLoop();
+    };
+  }, [isResting, isPaused, voiceCoachEnabled, voiceCoach]);
+
   // Rest timer
   useEffect(() => {
     if (isResting && restTime > 0 && !isPaused) {
@@ -54,12 +98,20 @@ const WorkoutView = ({ onClose }: WorkoutViewProps) => {
     const reps = currentExercise.reps * currentExercise.sets;
     setCompletedReps(completedReps + reps);
     addReps(reps, currentExercise.muscles[0]);
+    voiceCoach.stopMotivationalLoop();
 
     if (currentIndex < workoutExercises.length - 1) {
       setIsResting(true);
       setRestTime(currentExercise.restSeconds);
+      
+      // Announce rest period
+      const nextExercise = workoutExercises[currentIndex + 1];
+      const nextName = language === 'es' ? nextExercise.nameEs : nextExercise.name;
+      voiceCoach.announceRest(currentExercise.restSeconds, nextName);
     } else {
-      // Workout complete
+      // Workout complete - announce end
+      voiceCoach.announceEnd();
+      
       const durationMinutes = Math.round((Date.now() - startTime) / 60000);
       addSession({
         date: new Date().toISOString(),
@@ -72,16 +124,27 @@ const WorkoutView = ({ onClose }: WorkoutViewProps) => {
         durationMinutes: Math.max(1, durationMinutes),
         mode: 'guided',
       });
-      onClose();
+      
+      setTimeout(() => onClose(), 2000);
     }
   };
 
   const handleSkip = () => {
+    voiceCoach.stopMotivationalLoop();
     if (currentIndex < workoutExercises.length - 1) {
+      const nextExercise = workoutExercises[currentIndex + 1];
+      const nextName = language === 'es' ? nextExercise.nameEs : nextExercise.name;
+      voiceCoach.announceExercise(nextName, nextExercise.reps);
       setCurrentIndex(currentIndex + 1);
     } else {
+      voiceCoach.stopSpeaking();
       onClose();
     }
+  };
+
+  const handleClose = () => {
+    voiceCoach.stopSpeaking();
+    onClose();
   };
 
   const progress = ((currentIndex + (isResting ? 1 : 0)) / workoutExercises.length) * 100;
@@ -90,9 +153,16 @@ const WorkoutView = ({ onClose }: WorkoutViewProps) => {
     <div className="fixed inset-0 bg-background z-50 flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b-2 border-border">
-        <button onClick={onClose} className="p-2 hover:bg-muted rounded-sm">
+        <button onClick={handleClose} className="p-2 hover:bg-muted rounded-sm">
           <X className="w-6 h-6" />
         </button>
+        <div className="flex items-center gap-2">
+          {voiceCoachEnabled ? (
+            <Volume2 className="w-4 h-4 text-primary" />
+          ) : (
+            <VolumeX className="w-4 h-4 text-muted-foreground" />
+          )}
+        </div>
         <div className="text-center">
           <div className="terminal-text">
             {currentIndex + 1}/{workoutExercises.length}

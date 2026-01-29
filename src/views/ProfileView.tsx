@@ -1,13 +1,28 @@
+import { useState } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
+import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { Download, Trash2, Globe } from 'lucide-react';
+import { Download, Trash2, Globe, User, Volume2 } from 'lucide-react';
 import { exportData, exportCSV } from '@/lib/store';
 
 const ProfileView = () => {
   const { state, t, language, setLanguage, updateProfile, resetData } = useApp();
   const { profile } = state;
+  const [nameInput, setNameInput] = useState(profile.name);
+  const [ageInput, setAgeInput] = useState(profile.age > 0 ? profile.age.toString() : '');
+
+  const handleNameBlur = () => {
+    updateProfile({ name: nameInput.trim() });
+  };
+
+  const handleAgeBlur = () => {
+    const age = parseInt(ageInput, 10);
+    if (!isNaN(age) && age > 0 && age < 120) {
+      updateProfile({ age });
+    }
+  };
 
   const handleExportJSON = () => {
     const data = exportData();
@@ -47,6 +62,39 @@ const ProfileView = () => {
       <p className="text-muted-foreground mb-6">
         {language === 'es' ? 'Personalización real' : 'Real personalization'}
       </p>
+
+      {/* Name & Age */}
+      <div className="card-brutal p-4 mb-4">
+        <div className="flex items-center gap-2 mb-3">
+          <User className="w-4 h-4 text-muted-foreground" />
+          <span className="terminal-text">{language === 'es' ? 'IDENTIDAD' : 'IDENTITY'}</span>
+        </div>
+        <div className="space-y-3">
+          <div>
+            <label className="text-sm text-muted-foreground mb-1 block">{t.profile.name}</label>
+            <Input
+              value={nameInput}
+              onChange={(e) => setNameInput(e.target.value)}
+              onBlur={handleNameBlur}
+              placeholder={t.profile.namePlaceholder}
+              className="border-2 border-border bg-background"
+            />
+          </div>
+          <div>
+            <label className="text-sm text-muted-foreground mb-1 block">{t.profile.age}</label>
+            <Input
+              type="number"
+              value={ageInput}
+              onChange={(e) => setAgeInput(e.target.value)}
+              onBlur={handleAgeBlur}
+              placeholder={t.profile.agePlaceholder}
+              min={1}
+              max={120}
+              className="border-2 border-border bg-background w-24"
+            />
+          </div>
+        </div>
+      </div>
 
       {/* Language Toggle */}
       <div className="card-brutal p-4 mb-4">
@@ -155,6 +203,25 @@ const ProfileView = () => {
               {label}
             </button>
           ))}
+        </div>
+      </div>
+
+      {/* Voice Coach */}
+      <div className="card-brutal p-4 mb-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Volume2 className="w-4 h-4 text-primary" />
+            <div>
+              <div className="font-medium">{t.profile.voiceCoach}</div>
+              <div className="text-xs text-muted-foreground">
+                {t.profile.voiceCoachDesc}
+              </div>
+            </div>
+          </div>
+          <Switch
+            checked={profile.voiceCoachEnabled}
+            onCheckedChange={(checked) => updateProfile({ voiceCoachEnabled: checked })}
+          />
         </div>
       </div>
 
