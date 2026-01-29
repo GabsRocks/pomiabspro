@@ -3,6 +3,7 @@ import { Language } from './i18n';
 
 export interface UserProfile {
   name: string;
+  age: number;
   level: 'sedentary' | 'active' | 'advanced';
   injuries: string[];
   preferences: {
@@ -16,6 +17,7 @@ export interface UserProfile {
   primaryGoal: string;
   secondaryGoal: string;
   silentMode: boolean;
+  voiceCoachEnabled: boolean;
   language: Language;
   setupComplete: boolean;
 }
@@ -55,6 +57,7 @@ export interface AppState {
 
 const DEFAULT_PROFILE: UserProfile = {
   name: '',
+  age: 0,
   level: 'sedentary',
   injuries: [],
   preferences: {
@@ -68,6 +71,7 @@ const DEFAULT_PROFILE: UserProfile = {
   primaryGoal: 'discipline',
   secondaryGoal: '',
   silentMode: false,
+  voiceCoachEnabled: true,
   language: 'es',
   setupComplete: false,
 };

@@ -27,6 +27,10 @@ export const translations = {
     // Profile
     profile: {
       title: 'Perfil',
+      name: 'Nombre',
+      namePlaceholder: 'Tu nombre',
+      age: 'Edad',
+      agePlaceholder: 'Tu edad',
       level: 'Nivel',
       sedentary: 'Sedentario',
       active: 'Activo',
@@ -47,6 +51,8 @@ export const translations = {
       normal: 'Normal',
       aggressive: 'Agresivo',
       silentMode: 'Modo silencio',
+      voiceCoach: 'Entrenador por voz',
+      voiceCoachDesc: 'Instrucciones y motivación hablada',
     },
     // Challenges
     challenges: {
@@ -132,6 +138,10 @@ export const translations = {
     },
     profile: {
       title: 'Profile',
+      name: 'Name',
+      namePlaceholder: 'Your name',
+      age: 'Age',
+      agePlaceholder: 'Your age',
       level: 'Level',
       sedentary: 'Sedentary',
       active: 'Active',
@@ -152,6 +162,8 @@ export const translations = {
       normal: 'Normal',
       aggressive: 'Aggressive',
       silentMode: 'Silent mode',
+      voiceCoach: 'Voice Coach',
+      voiceCoachDesc: 'Spoken instructions and motivation',
     },
     challenges: {
       title: 'Challenges',
