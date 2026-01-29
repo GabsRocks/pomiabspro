@@ -1,13 +1,53 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { useState } from 'react';
+import { AppProvider } from '@/contexts/AppContext';
+import BottomNav from '@/components/BottomNav';
+import DashboardView from '@/views/DashboardView';
+import ChallengesView from '@/views/ChallengesView';
+import ExercisesView from '@/views/ExercisesView';
+import MetricsView from '@/views/MetricsView';
+import ProfileView from '@/views/ProfileView';
+import WorkoutView from '@/views/WorkoutView';
+
+const AppContent = () => {
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [isWorkoutActive, setIsWorkoutActive] = useState(false);
+
+  const renderView = () => {
+    switch (activeTab) {
+      case 'dashboard':
+        return <DashboardView onStartWorkout={() => setIsWorkoutActive(true)} />;
+      case 'challenges':
+        return <ChallengesView />;
+      case 'exercises':
+        return <ExercisesView />;
+      case 'metrics':
+        return <MetricsView />;
+      case 'profile':
+        return <ProfileView />;
+      default:
+        return <DashboardView onStartWorkout={() => setIsWorkoutActive(true)} />;
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      {isWorkoutActive ? (
+        <WorkoutView onClose={() => setIsWorkoutActive(false)} />
+      ) : (
+        <>
+          {renderView()}
+          <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
+        </>
+      )}
+    </div>
+  );
+};
 
 const Index = () => {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
-      </div>
-    </div>
+    <AppProvider>
+      <AppContent />
+    </AppProvider>
   );
 };
 
