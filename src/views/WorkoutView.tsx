@@ -1,10 +1,12 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
 import { exercises } from '@/lib/exercises';
 import { X, Play, Pause, SkipForward, Check, Volume2, VolumeX } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useVoiceCoach } from '@/hooks/useVoiceCoach';
+import ExerciseIllustration from '@/components/ExerciseIllustration';
+import WorkoutTimer from '@/components/WorkoutTimer';
 
 interface WorkoutViewProps {
   onClose: () => void;
@@ -45,6 +47,18 @@ const WorkoutView = ({ onClose }: WorkoutViewProps) => {
   const [startTime] = useState(Date.now());
 
   const currentExercise = workoutExercises[currentIndex];
+
+  // Handle time updates for milestone announcements
+  const handleTimeUpdate = useCallback((elapsedSeconds: number) => {
+    if (voiceCoachEnabled && !isResting && !isPaused) {
+      voiceCoach.checkTimeMilestone(elapsedSeconds);
+    }
+  }, [voiceCoach, voiceCoachEnabled, isResting, isPaused]);
+
+  // Reset milestones when starting new workout
+  useEffect(() => {
+    voiceCoach.resetMilestones();
+  }, []);
 
   // Announce first exercise on mount
   useEffect(() => {
@@ -156,18 +170,25 @@ const WorkoutView = ({ onClose }: WorkoutViewProps) => {
         <button onClick={handleClose} className="p-2 hover:bg-muted rounded-sm">
           <X className="w-6 h-6" />
         </button>
-        <div className="flex items-center gap-2">
+        
+        {/* Timer */}
+        <WorkoutTimer 
+          startTime={startTime} 
+          isPaused={isPaused || isResting}
+          onTimeUpdate={handleTimeUpdate}
+        />
+        
+        <div className="flex items-center gap-3">
           {voiceCoachEnabled ? (
             <Volume2 className="w-4 h-4 text-primary" />
           ) : (
             <VolumeX className="w-4 h-4 text-muted-foreground" />
           )}
-        </div>
-        <div className="text-center">
           <div className="terminal-text">
             {currentIndex + 1}/{workoutExercises.length}
           </div>
         </div>
+        
         <div className="font-mono text-primary">{completedReps} reps</div>
       </div>
 
@@ -180,38 +201,60 @@ const WorkoutView = ({ onClose }: WorkoutViewProps) => {
       </div>
 
       {/* Content */}
-      <div className="flex-1 flex flex-col items-center justify-center p-6">
+      <div className="flex-1 flex flex-col items-center justify-center p-6 overflow-auto">
         {isResting ? (
           <div className="text-center animate-fade-in">
             <div className="terminal-text mb-4">
               {language === 'es' ? 'DESCANSO' : 'REST'}
             </div>
             <div className="metric-display text-accent mb-8">{restTime}</div>
-            <div className="text-muted-foreground">
-              {language === 'es' ? 'Siguiente:' : 'Next:'}{' '}
-              {language === 'es'
-                ? workoutExercises[currentIndex + 1]?.nameEs
-                : workoutExercises[currentIndex + 1]?.name}
-            </div>
+            
+            {/* Next exercise preview */}
+            {workoutExercises[currentIndex + 1] && (
+              <div className="space-y-4">
+                <div className="text-muted-foreground mb-2">
+                  {language === 'es' ? 'Siguiente:' : 'Next:'}
+                </div>
+                <ExerciseIllustration
+                  category={workoutExercises[currentIndex + 1].category}
+                  muscles={workoutExercises[currentIndex + 1].muscles}
+                  size="lg"
+                  className="mx-auto"
+                />
+                <div className="font-bold text-lg">
+                  {language === 'es'
+                    ? workoutExercises[currentIndex + 1]?.nameEs
+                    : workoutExercises[currentIndex + 1]?.name}
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div className="text-center animate-fade-in w-full max-w-sm">
+            {/* Exercise illustration */}
+            <ExerciseIllustration
+              category={currentExercise.category}
+              muscles={currentExercise.muscles}
+              size="lg"
+              className="mx-auto mb-6"
+            />
+            
             <h2 className="text-2xl font-bold mb-2">
               {language === 'es' ? currentExercise.nameEs : currentExercise.name}
             </h2>
-            <p className="text-muted-foreground mb-8">
+            <p className="text-muted-foreground mb-6 text-sm">
               {language === 'es' ? currentExercise.instructionsEs : currentExercise.instructions}
             </p>
 
-            <div className="grid grid-cols-2 gap-4 mb-8">
+            <div className="grid grid-cols-2 gap-4 mb-6">
               <div className="card-brutal p-4 text-center">
-                <div className="terminal-text mb-1">REPS</div>
+                <div className="terminal-text mb-1 text-xs">REPS</div>
                 <div className="font-mono text-3xl font-bold text-primary">
                   {currentExercise.reps}
                 </div>
               </div>
               <div className="card-brutal p-4 text-center">
-                <div className="terminal-text mb-1">SETS</div>
+                <div className="terminal-text mb-1 text-xs">SETS</div>
                 <div className="font-mono text-3xl font-bold text-accent">
                   {currentExercise.sets}
                 </div>
@@ -219,11 +262,11 @@ const WorkoutView = ({ onClose }: WorkoutViewProps) => {
             </div>
 
             {/* Muscles */}
-            <div className="flex gap-2 justify-center mb-6">
+            <div className="flex gap-2 justify-center flex-wrap">
               {currentExercise.muscles.map((muscle) => (
                 <span
                   key={muscle}
-                  className="text-xs uppercase tracking-wider px-2 py-1 bg-secondary text-muted-foreground"
+                  className="text-xs uppercase tracking-wider px-2 py-1 bg-secondary text-muted-foreground border border-border"
                 >
                   {muscle}
                 </span>

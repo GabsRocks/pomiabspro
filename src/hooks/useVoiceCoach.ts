@@ -38,10 +38,28 @@ const motivationalPhrasesEn = [
   "Every rep counts, {name}.",
 ];
 
+// Time milestones for announcements
+const timeMilestonesEs: Record<number, string> = {
+  5: "¡{name}, 5 minutos de fuego! ¡Excelente ritmo!",
+  10: "¡10 minutos, {name}! ¡Sigue empujando!",
+  20: "¡20 minutos de puro esfuerzo, {name}! ¡Eres una máquina!",
+  30: "¡Media hora, {name}! ¡Nivel guerrero alcanzado!",
+  45: "¡45 minutos, {name}! ¡Esto es élite!",
+};
+
+const timeMilestonesEn: Record<number, string> = {
+  5: "{name}, 5 minutes of fire! Great pace!",
+  10: "10 minutes, {name}! Keep pushing!",
+  20: "20 minutes of pure effort, {name}! You're a machine!",
+  30: "Half hour, {name}! Warrior level achieved!",
+  45: "45 minutes, {name}! This is elite!",
+};
+
 export const useVoiceCoach = ({ language, enabled, userName }: VoiceCoachOptions) => {
   const speechSynthRef = useRef<SpeechSynthesisUtterance | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const phraseIndexRef = useRef(0);
+  const announcedMilestonesRef = useRef<Set<number>>(new Set());
 
   const getVoice = useCallback(() => {
     const voices = window.speechSynthesis.getVoices();
@@ -71,7 +89,7 @@ export const useVoiceCoach = ({ language, enabled, userName }: VoiceCoachOptions
 
   const speakWithName = useCallback((text: string) => {
     const name = userName || (language === 'es' ? 'Campeón' : 'Champion');
-    const personalizedText = text.replace('{name}', name);
+    const personalizedText = text.replace(/{name}/g, name);
     speak(personalizedText);
   }, [speak, userName, language]);
 
@@ -106,6 +124,31 @@ export const useVoiceCoach = ({ language, enabled, userName }: VoiceCoachOptions
       : `${name}, now: ${exerciseName}. ${reps} reps.`;
     speak(message);
   }, [speak, userName, language]);
+
+  const announceTimeMilestone = useCallback((minutes: number) => {
+    if (!enabled) return;
+    
+    const milestones = language === 'es' ? timeMilestonesEs : timeMilestonesEn;
+    const milestone = milestones[minutes];
+    
+    if (milestone && !announcedMilestonesRef.current.has(minutes)) {
+      announcedMilestonesRef.current.add(minutes);
+      speakWithName(milestone);
+    }
+  }, [enabled, language, speakWithName]);
+
+  const checkTimeMilestone = useCallback((elapsedSeconds: number) => {
+    const minutes = Math.floor(elapsedSeconds / 60);
+    const milestoneMinutes = [5, 10, 20, 30, 45];
+    
+    if (milestoneMinutes.includes(minutes)) {
+      announceTimeMilestone(minutes);
+    }
+  }, [announceTimeMilestone]);
+
+  const resetMilestones = useCallback(() => {
+    announcedMilestonesRef.current.clear();
+  }, []);
 
   const getRandomMotivationalPhrase = useCallback(() => {
     const phrases = language === 'es' ? motivationalPhrasesEs : motivationalPhrasesEn;
@@ -164,6 +207,9 @@ export const useVoiceCoach = ({ language, enabled, userName }: VoiceCoachOptions
     announceEnd,
     announceRest,
     announceExercise,
+    announceTimeMilestone,
+    checkTimeMilestone,
+    resetMilestones,
     startMotivationalLoop,
     stopMotivationalLoop,
     stopSpeaking,
