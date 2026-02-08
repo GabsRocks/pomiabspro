@@ -15,6 +15,7 @@ export interface Exercise {
   difficulty: 1 | 2 | 3;
   instructions: string;
   instructionsEs: string;
+  imageUrl?: string;
 }
 
 export const exercises: Exercise[] = [
