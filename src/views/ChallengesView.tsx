@@ -13,6 +13,7 @@ const ChallengesView = () => {
     { key: 'time', label: t.challenges.time },
     { key: 'style', label: t.challenges.style },
     { key: 'restriction', label: t.challenges.restriction },
+    { key: 'military', label: t.challenges.military },
   ];
 
   const filteredChallenges = getChallengesByType(activeType);

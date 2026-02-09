@@ -61,12 +61,14 @@ export const translations = {
       time: 'Por tiempo',
       style: 'Por estilo',
       restriction: 'Por restricción',
+      military: 'Militar',
       active: 'Activo',
       completed: 'Completado',
       locked: 'Bloqueado',
       start: 'COMENZAR',
       days: 'días',
       reps: 'reps',
+      minutes: 'min',
     },
     // Exercises
     exercises: {
@@ -78,6 +80,7 @@ export const translations = {
         office: 'Oficina',
         stretch: 'Estiramientos',
         yoga: 'Yoga',
+        military: 'Militar',
       },
     },
     // Metrics
@@ -171,12 +174,14 @@ export const translations = {
       time: 'By time',
       style: 'By style',
       restriction: 'By restriction',
+      military: 'Military',
       active: 'Active',
       completed: 'Completed',
       locked: 'Locked',
       start: 'START',
       days: 'days',
       reps: 'reps',
+      minutes: 'min',
     },
     exercises: {
       title: 'Exercises',
@@ -187,6 +192,7 @@ export const translations = {
         office: 'Office',
         stretch: 'Stretches',
         yoga: 'Yoga',
+        military: 'Military',
       },
     },
     metrics: {

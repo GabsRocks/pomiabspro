@@ -21,6 +21,7 @@ const ExerciseCard = ({ exercise, onClick, compact = false }: ExerciseCardProps)
     office: 'bg-primary/20 text-primary',
     stretch: 'bg-success/20 text-success',
     yoga: 'bg-elite/20 text-elite',
+    military: 'bg-destructive/30 text-destructive',
   };
 
   const categoryLabels: Record<Exercise['category'], string> = {
@@ -30,6 +31,7 @@ const ExerciseCard = ({ exercise, onClick, compact = false }: ExerciseCardProps)
     office: language === 'es' ? 'Oficina' : 'Office',
     stretch: language === 'es' ? 'Estira' : 'Stretch',
     yoga: 'Yoga',
+    military: language === 'es' ? 'Militar' : 'Military',
   };
 
   if (compact) {
