@@ -6,10 +6,11 @@ export interface Challenge {
   nameEs: string;
   description: string;
   descriptionEs: string;
-  type: 'volume' | 'time' | 'style' | 'restriction';
-  style?: 'combat' | 'warrior' | 'survival' | 'cardio' | 'strength' | 'control';
+  type: 'volume' | 'time' | 'style' | 'restriction' | 'military';
+  style?: 'combat' | 'warrior' | 'survival' | 'cardio' | 'strength' | 'control' | 'military';
   targetReps?: number;
   targetDays?: number;
+  targetMinutes?: number;
   difficulty: 1 | 2 | 3; // 1=Normal, 2=Hard, 3=Elite
   exercises: string[];
   dailyTarget?: number;
@@ -225,6 +226,146 @@ export const challenges: Challenge[] = [
     exercises: ['march-steps', 'chair-squats', 'arm-circles', 'seated-boxer'],
     icon: '🔇',
   },
+  // ========== MILITARY CHALLENGES ==========
+  {
+    id: 'military-bootcamp-45',
+    name: 'Military Bootcamp 45',
+    nameEs: 'Bootcamp Militar 45',
+    description: '45 minutes of pure military conditioning. Fat burning from minute 1. No mercy.',
+    descriptionEs: '45 minutos de acondicionamiento militar puro. Quema grasa desde el minuto 1. Sin piedad.',
+    type: 'military',
+    style: 'military',
+    targetMinutes: 45,
+    targetReps: 800,
+    difficulty: 3,
+    exercises: [
+      'burpees-modified',
+      'military-pushups', 
+      'mountain-climbers-fast',
+      'squat-jumps',
+      'flutter-kicks-military',
+      'plank-jacks',
+      'tuck-jumps',
+      'diamond-pushups',
+      'russian-twists',
+      'power-lunges',
+      'commandos',
+      'bicycle-crunches-fast',
+      'sprawls',
+      'v-ups',
+      'bear-crawls',
+      'side-plank-dips',
+      'inchworms',
+      'plank-hold',
+      'ski-jumps',
+      'superman-holds'
+    ],
+    icon: '🎖️',
+  },
+  {
+    id: 'delta-force',
+    name: 'Delta Force',
+    nameEs: 'Fuerza Delta',
+    description: 'Elite special forces training. 45 min of relentless intensity.',
+    descriptionEs: 'Entrenamiento de fuerzas especiales élite. 45 min de intensidad implacable.',
+    type: 'military',
+    style: 'military',
+    targetMinutes: 45,
+    targetReps: 1000,
+    difficulty: 3,
+    exercises: [
+      'burpees-modified',
+      'military-pushups',
+      'tuck-jumps',
+      'mountain-climbers-fast',
+      'diamond-pushups',
+      'squat-jumps',
+      'commandos',
+      'v-ups',
+      'power-lunges',
+      'sprawls'
+    ],
+    icon: '🦅',
+    unlockCondition: 'military-bootcamp-45',
+  },
+  {
+    id: 'navy-seal-challenge',
+    name: 'Navy SEAL Challenge',
+    nameEs: 'Reto Navy SEAL',
+    description: 'The ultimate test. 45 min of brutal conditioning used by Navy SEALs.',
+    descriptionEs: 'La prueba definitiva. 45 min de acondicionamiento brutal usado por Navy SEALs.',
+    type: 'military',
+    style: 'military',
+    targetMinutes: 45,
+    targetReps: 1200,
+    difficulty: 3,
+    exercises: [
+      'burpees-modified',
+      'military-pushups',
+      'flutter-kicks-military',
+      'squat-jumps',
+      'mountain-climbers-fast',
+      'plank-hold',
+      'tuck-jumps',
+      'v-ups',
+      'bear-crawls',
+      'diamond-pushups',
+      'power-lunges',
+      'inchworms'
+    ],
+    icon: '🔱',
+    unlockCondition: 'delta-force',
+  },
+  {
+    id: 'ranger-endurance',
+    name: 'Ranger Endurance',
+    nameEs: 'Resistencia Ranger',
+    description: 'Army Ranger style endurance. Push your limits for 45 grueling minutes.',
+    descriptionEs: 'Resistencia estilo Army Ranger. Supera tus límites en 45 minutos intensos.',
+    type: 'military',
+    style: 'military',
+    targetMinutes: 45,
+    targetReps: 900,
+    difficulty: 3,
+    exercises: [
+      'mountain-climbers-fast',
+      'squat-jumps',
+      'plank-jacks',
+      'russian-twists',
+      'bicycle-crunches-fast',
+      'ski-jumps',
+      'bear-crawls',
+      'side-plank-dips',
+      'superman-holds',
+      'commandos'
+    ],
+    icon: '⚡',
+  },
+  {
+    id: 'marine-corps-45',
+    name: 'Marine Corps 45',
+    nameEs: 'Cuerpo de Marines 45',
+    description: 'USMC inspired workout. Semper Fi. 45 minutes of pure grit.',
+    descriptionEs: 'Entrenamiento inspirado en USMC. Semper Fi. 45 minutos de pura determinación.',
+    type: 'military',
+    style: 'military',
+    targetMinutes: 45,
+    targetReps: 850,
+    difficulty: 3,
+    exercises: [
+      'military-pushups',
+      'burpees-modified',
+      'flutter-kicks-military',
+      'power-lunges',
+      'plank-hold',
+      'tuck-jumps',
+      'v-ups',
+      'sprawls',
+      'diamond-pushups',
+      'mountain-climbers-fast'
+    ],
+    icon: '🦁',
+  },
 ];
 
 export const getChallengesByType = (type: Challenge['type']) =>
@@ -232,3 +373,6 @@ export const getChallengesByType = (type: Challenge['type']) =>
 
 export const getUnlockedChallenges = (completedIds: string[]) =>
   challenges.filter(c => !c.unlockCondition || completedIds.includes(c.unlockCondition));
+
+export const getMilitaryChallenges = () =>
+  challenges.filter(c => c.type === 'military');

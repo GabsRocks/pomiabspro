@@ -2,7 +2,7 @@
 import { cn } from '@/lib/utils';
 
 interface ExerciseIllustrationProps {
-  category: 'chair' | 'strength' | 'cardio' | 'office' | 'stretch' | 'yoga';
+  category: 'chair' | 'strength' | 'cardio' | 'office' | 'stretch' | 'yoga' | 'military';
   muscles: string[];
   className?: string;
   size?: 'sm' | 'md' | 'lg';
@@ -90,6 +90,23 @@ const categoryIcons: Record<string, JSX.Element> = {
       {/* Om symbol stylized */}
       <circle cx="50" cy="50" r="35" className="stroke-primary/30" strokeWidth="1" fill="none" />
       <circle cx="50" cy="50" r="40" className="stroke-primary/20" strokeWidth="1" fill="none" />
+    </svg>
+  ),
+  military: (
+    <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      {/* Military boot camp - intense exercise */}
+      <circle cx="50" cy="15" r="7" className="fill-destructive" />
+      {/* Body in push-up position */}
+      <path d="M50 22 L50 35 L25 55" className="stroke-destructive" strokeWidth="4" strokeLinecap="round" />
+      <path d="M50 35 L75 55" className="stroke-destructive" strokeWidth="4" strokeLinecap="round" />
+      <path d="M25 55 L15 75" className="stroke-destructive" strokeWidth="4" strokeLinecap="round" />
+      <path d="M75 55 L85 75" className="stroke-destructive" strokeWidth="4" strokeLinecap="round" />
+      {/* Sweat drops */}
+      <circle cx="35" cy="20" r="2" className="fill-primary" />
+      <circle cx="65" cy="22" r="2" className="fill-primary" />
+      {/* Fire/intensity */}
+      <path d="M45 80 Q 50 70, 55 80 Q 50 75, 45 80" className="fill-warning" />
+      <path d="M50 85 Q 53 78, 56 85 Q 53 82, 50 85" className="fill-destructive" />
     </svg>
   ),
 };
