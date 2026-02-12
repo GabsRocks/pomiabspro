@@ -18,6 +18,7 @@ export interface UserProfile {
   secondaryGoal: string;
   silentMode: boolean;
   voiceCoachEnabled: boolean;
+  voiceVolume: number;
   language: Language;
   setupComplete: boolean;
 }
@@ -72,6 +73,7 @@ const DEFAULT_PROFILE: UserProfile = {
   secondaryGoal: '',
   silentMode: false,
   voiceCoachEnabled: true,
+  voiceVolume: 1.0,
   language: 'es',
   setupComplete: false,
 };

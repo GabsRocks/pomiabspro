@@ -6,6 +6,7 @@ interface VoiceCoachOptions {
   language: Language;
   enabled: boolean;
   userName?: string;
+  volume?: number;
 }
 
 const motivationalPhrasesEs = [
@@ -55,7 +56,7 @@ const timeMilestonesEn: Record<number, string> = {
   45: "45 minutes, {name}! This is elite!",
 };
 
-export const useVoiceCoach = ({ language, enabled, userName }: VoiceCoachOptions) => {
+export const useVoiceCoach = ({ language, enabled, userName, volume = 1.0 }: VoiceCoachOptions) => {
   const speechSynthRef = useRef<SpeechSynthesisUtterance | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const phraseIndexRef = useRef(0);
@@ -81,11 +82,11 @@ export const useVoiceCoach = ({ language, enabled, userName }: VoiceCoachOptions
     utterance.lang = language === 'es' ? 'es-MX' : 'en-US';
     utterance.rate = 1.0;
     utterance.pitch = 1.0;
-    utterance.volume = 1.0;
+    utterance.volume = Math.min(1.0, Math.max(0, volume));
 
     speechSynthRef.current = utterance;
     window.speechSynthesis.speak(utterance);
-  }, [enabled, language, getVoice]);
+  }, [enabled, language, getVoice, volume]);
 
   const speakWithName = useCallback((text: string) => {
     const name = userName || (language === 'es' ? 'Campeón' : 'Champion');
