@@ -5,7 +5,7 @@ import { exercises } from '@/lib/exercises';
 import { X, Play, Pause, SkipForward, Check, Volume2, VolumeX } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useVoiceCoach } from '@/hooks/useVoiceCoach';
-import ExerciseIllustration from '@/components/ExerciseIllustration';
+
 import WorkoutTimer from '@/components/WorkoutTimer';
 import WorkoutConfig, { WorkoutSettings } from '@/components/WorkoutConfig';
 
@@ -266,12 +266,6 @@ const WorkoutView = ({ onClose }: WorkoutViewProps) => {
                 <div className="text-muted-foreground mb-2">
                   {language === 'es' ? 'Siguiente:' : 'Next:'}
                 </div>
-                <ExerciseIllustration
-                  category={workoutExercises[currentIndex + 1].category}
-                  muscles={workoutExercises[currentIndex + 1].muscles}
-                  size="lg"
-                  className="mx-auto"
-                />
                 <div className="font-bold text-lg">
                   {language === 'es'
                     ? workoutExercises[currentIndex + 1]?.nameEs
@@ -282,13 +276,6 @@ const WorkoutView = ({ onClose }: WorkoutViewProps) => {
           </div>
         ) : (
           <div className="text-center animate-fade-in w-full max-w-sm">
-            {/* Exercise illustration */}
-            <ExerciseIllustration
-              category={currentExercise.category}
-              muscles={currentExercise.muscles}
-              size="lg"
-              className="mx-auto mb-6"
-            />
             
             <h2 className="text-2xl font-bold mb-2">
               {language === 'es' ? currentExercise.nameEs : currentExercise.name}
