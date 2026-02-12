@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import ChallengeCard from '@/components/ChallengeCard';
+import MilitarySection from '@/components/MilitarySection';
 import { challenges, getChallengesByType, Challenge } from '@/lib/challenges';
 import { cn } from '@/lib/utils';
 
@@ -71,17 +72,25 @@ const ChallengesView = () => {
       </div>
 
       {/* Challenges Grid */}
-      <div className="space-y-3">
-        {filteredChallenges.map((challenge) => (
-          <ChallengeCard
-            key={challenge.id}
-            challenge={challenge}
-            status={getChallengeStatus(challenge)}
-            progress={state.activeChallenge === challenge.id ? 25 : 0}
-            onClick={() => handleChallengeClick(challenge)}
-          />
-        ))}
-      </div>
+      {activeType === 'military' ? (
+        <MilitarySection
+          onStartChallenge={(challenge) => handleChallengeClick(challenge)}
+          completedIds={state.metrics.challengesCompleted}
+          activeChallengeId={state.activeChallenge}
+        />
+      ) : (
+        <div className="space-y-3">
+          {filteredChallenges.map((challenge) => (
+            <ChallengeCard
+              key={challenge.id}
+              challenge={challenge}
+              status={getChallengeStatus(challenge)}
+              progress={state.activeChallenge === challenge.id ? 25 : 0}
+              onClick={() => handleChallengeClick(challenge)}
+            />
+          ))}
+        </div>
+      )}
 
       {/* Stats */}
       <div className="mt-8 p-4 bg-secondary border-2 border-border">
