@@ -191,16 +191,24 @@ const WorkoutView = ({ onClose }: WorkoutViewProps) => {
     }
   }, [isConfiguring]);
 
-  // Announce first exercise on mount
+  // Announce first exercise on mount + total reps summary
   useEffect(() => {
     if (!isConfiguring && !hasAnnouncedStart.current && currentExercise && voiceCoachEnabled) {
       hasAnnouncedStart.current = true;
       const exerciseName = language === 'es' ? currentExercise.nameEs : currentExercise.name;
+      const totalExercises = workoutExercises.length;
+      const totalRepsEstimate = workoutExercises.reduce((sum, e) => sum + e.reps * e.sets, 0);
       setTimeout(() => {
-        voiceCoach.announceStart(exerciseName, currentExercise.reps, currentExercise.sets);
+        const intro = language === 'es'
+          ? `¡Vamos! ${totalExercises} ejercicios, aproximadamente ${totalRepsEstimate} repeticiones en total.`
+          : `Let's go! ${totalExercises} exercises, approximately ${totalRepsEstimate} total reps.`;
+        voiceCoach.speak(intro);
+        setTimeout(() => {
+          voiceCoach.announceStart(exerciseName, currentExercise.reps, currentExercise.sets);
+        }, 3000);
       }, 500);
     }
-  }, [isConfiguring, currentExercise, voiceCoach, voiceCoachEnabled, language]);
+  }, [isConfiguring, currentExercise, voiceCoach, voiceCoachEnabled, language, workoutExercises]);
 
   // Motivational phrases every 5 seconds during active exercise
   useEffect(() => {
@@ -215,34 +223,55 @@ const WorkoutView = ({ onClose }: WorkoutViewProps) => {
     };
   }, [isConfiguring, isResting, isPaused, voiceCoachEnabled, voiceCoach]);
 
-  // Rest timer
+  // Rest timer with voice countdown at key moments
   useEffect(() => {
     if (isResting && restTime > 0 && !isPaused) {
       const timer = setTimeout(() => {
-        setRestTime(restTime - 1);
+        const newTime = restTime - 1;
+        setRestTime(newTime);
+        // Voice countdown for last 3 seconds
+        if (newTime <= 3 && newTime > 0 && voiceCoachEnabled) {
+          voiceCoach.speak(`${newTime}`);
+        }
       }, 1000);
       return () => clearTimeout(timer);
     } else if (isResting && restTime === 0) {
       setIsResting(false);
       if (currentIndex < workoutExercises.length - 1) {
-        setCurrentIndex(currentIndex + 1);
+        const nextIdx = currentIndex + 1;
+        setCurrentIndex(nextIdx);
+        // Announce next exercise
+        if (voiceCoachEnabled) {
+          const next = workoutExercises[nextIdx];
+          const nextName = language === 'es' ? next.nameEs : next.name;
+          voiceCoach.announceExercise(nextName, next.reps);
+        }
       }
     }
-  }, [isResting, restTime, isPaused, currentIndex, workoutExercises.length]);
+  }, [isResting, restTime, isPaused, currentIndex, workoutExercises, voiceCoachEnabled, voiceCoach, language]);
 
   const handleComplete = () => {
     const reps = currentExercise.reps * currentExercise.sets;
     setCompletedReps(completedReps + reps);
     addReps(reps, currentExercise.muscles[0]);
     voiceCoach.stopMotivationalLoop();
+    setIsPaused(false);
+
+    // Voice: announce exercise done
+    if (voiceCoachEnabled) {
+      const name = language === 'es' ? '¡Ejercicio completado!' : 'Exercise complete!';
+      voiceCoach.speak(name);
+    }
 
     if (currentIndex < workoutExercises.length - 1) {
       setIsResting(true);
       setRestTime(workoutSettings?.restSeconds || 30);
       
-      const nextExercise = workoutExercises[currentIndex + 1];
-      const nextName = language === 'es' ? nextExercise.nameEs : nextExercise.name;
-      voiceCoach.announceRest(workoutSettings?.restSeconds || 30, nextName);
+      setTimeout(() => {
+        const nextExercise = workoutExercises[currentIndex + 1];
+        const nextName = language === 'es' ? nextExercise.nameEs : nextExercise.name;
+        voiceCoach.announceRest(workoutSettings?.restSeconds || 30, nextName);
+      }, 1500);
     } else {
       finishWorkout();
     }
@@ -510,27 +539,47 @@ const WorkoutView = ({ onClose }: WorkoutViewProps) => {
                 variant="outline"
                 className="flex-1 h-14 border-2"
               >
-                {isPaused ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
+                {isPaused ? <Play className="w-5 h-5 mr-2" /> : <Pause className="w-5 h-5 mr-2" />}
+                {isPaused 
+                  ? (language === 'es' ? 'CONTINUAR' : 'RESUME') 
+                  : (language === 'es' ? 'PAUSA' : 'PAUSE')}
               </Button>
               <Button
                 onClick={() => {
                   setIsResting(false);
-                  setCurrentIndex(currentIndex + 1);
+                  if (currentIndex < workoutExercises.length - 1) {
+                    const nextIdx = currentIndex + 1;
+                    setCurrentIndex(nextIdx);
+                    if (voiceCoachEnabled) {
+                      const next = workoutExercises[nextIdx];
+                      const nextName = language === 'es' ? next.nameEs : next.name;
+                      voiceCoach.announceExercise(nextName, next.reps);
+                    }
+                  }
                 }}
                 className="flex-1 h-14 btn-military"
               >
                 <SkipForward className="w-5 h-5 mr-2" />
-                {language === 'es' ? 'SALTAR' : 'SKIP'}
+                {language === 'es' ? 'SIGUIENTE' : 'NEXT'}
               </Button>
             </>
           ) : (
             <>
+              {/* Pause / Resume during exercise */}
               <Button
-                onClick={handleSkip}
+                onClick={() => {
+                  const wasPaused = isPaused;
+                  setIsPaused(!isPaused);
+                  if (voiceCoachEnabled && wasPaused) {
+                    voiceCoach.speak(language === 'es' ? '¡Vamos, continúa!' : "Let's go, continue!");
+                  } else if (voiceCoachEnabled && !wasPaused) {
+                    voiceCoach.speak(language === 'es' ? 'Pausa' : 'Pause');
+                  }
+                }}
                 variant="outline"
-                className="h-14 px-6 border-2"
+                className="h-14 px-5 border-2"
               >
-                <SkipForward className="w-5 h-5" />
+                {isPaused ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
               </Button>
               <Button
                 onClick={handleComplete}
@@ -539,7 +588,15 @@ const WorkoutView = ({ onClose }: WorkoutViewProps) => {
                 <Check className="w-5 h-5 mr-2" />
                 {t.common.complete}
               </Button>
+              <Button
+                onClick={handleSkip}
+                variant="outline"
+                className="h-14 px-5 border-2"
+              >
+                <SkipForward className="w-5 h-5" />
+              </Button>
             </>
+
           )}
         </div>
       </div>
