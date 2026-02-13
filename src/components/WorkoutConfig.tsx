@@ -1,7 +1,7 @@
-// PomiABSPro - Workout Configuration Component
-import { useState } from 'react';
+// PomiABSPro - Workout Configuration Component with Chronometer-Style Selectors
+import { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Clock, Timer, Play } from 'lucide-react';
+import { Clock, Timer, Play, ChevronUp, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface WorkoutConfigProps {
@@ -15,15 +15,46 @@ export interface WorkoutSettings {
   restSeconds: number;
 }
 
-const durationOptions = [5, 10, 20, 30, 45];
-const restOptions = [15, 30, 45, 60];
+const durationOptions = [5, 10, 15, 20, 30, 45];
+const restOptions = [15, 20, 30, 45, 60, 90];
 
 const WorkoutConfig = ({ language, onStart, onCancel }: WorkoutConfigProps) => {
-  const [duration, setDuration] = useState(10);
-  const [rest, setRest] = useState(30);
+  const [durationIdx, setDurationIdx] = useState(1); // default 10 min
+  const [restIdx, setRestIdx] = useState(2); // default 30 sec
+
+  const duration = durationOptions[durationIdx];
+  const rest = restOptions[restIdx];
+
+  const cycleDuration = useCallback((dir: 1 | -1) => {
+    setDurationIdx(prev => {
+      const next = prev + dir;
+      if (next < 0) return durationOptions.length - 1;
+      if (next >= durationOptions.length) return 0;
+      return next;
+    });
+  }, []);
+
+  const cycleRest = useCallback((dir: 1 | -1) => {
+    setRestIdx(prev => {
+      const next = prev + dir;
+      if (next < 0) return restOptions.length - 1;
+      if (next >= restOptions.length) return 0;
+      return next;
+    });
+  }, []);
 
   const handleStart = () => {
     onStart({ durationMinutes: duration, restSeconds: rest });
+  };
+
+  const formatDuration = (mins: number) => {
+    return `${mins.toString().padStart(2, '0')}:00`;
+  };
+
+  const formatRest = (secs: number) => {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
   return (
@@ -35,58 +66,74 @@ const WorkoutConfig = ({ language, onStart, onCancel }: WorkoutConfigProps) => {
         </h1>
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center p-6 gap-8">
-        {/* Duration Selection */}
-        <div className="w-full max-w-sm">
-          <div className="flex items-center gap-2 mb-4">
+      <div className="flex-1 flex flex-col items-center justify-center p-6 gap-10">
+        {/* Duration Chronometer */}
+        <div className="flex flex-col items-center gap-3">
+          <div className="flex items-center gap-2">
             <Clock className="w-5 h-5 text-primary" />
             <span className="terminal-text text-sm">
               {language === 'es' ? 'TIEMPO DE EJERCICIO' : 'EXERCISE TIME'}
             </span>
           </div>
-          <div className="grid grid-cols-5 gap-2">
-            {durationOptions.map((mins) => (
-              <button
-                key={mins}
-                onClick={() => setDuration(mins)}
-                className={cn(
-                  "card-brutal p-3 text-center transition-all",
-                  duration === mins 
-                    ? "bg-primary text-primary-foreground border-primary" 
-                    : "hover:bg-muted"
-                )}
-              >
-                <div className="font-mono text-xl font-bold">{mins}</div>
-                <div className="text-xs uppercase">min</div>
-              </button>
-            ))}
+
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => cycleDuration(-1)}
+              className="p-2 rounded-sm border-2 border-border hover:bg-muted active:scale-95 transition-transform"
+            >
+              <ChevronDown className="w-6 h-6 text-muted-foreground" />
+            </button>
+
+            <div className="card-brutal px-6 py-4 min-w-[160px] text-center bg-card border-primary/30">
+              <div className="font-mono text-4xl font-bold text-primary tracking-wider">
+                {formatDuration(duration)}
+              </div>
+              <div className="text-xs text-muted-foreground mt-1 uppercase tracking-widest">
+                {language === 'es' ? 'minutos' : 'minutes'}
+              </div>
+            </div>
+
+            <button
+              onClick={() => cycleDuration(1)}
+              className="p-2 rounded-sm border-2 border-border hover:bg-muted active:scale-95 transition-transform"
+            >
+              <ChevronUp className="w-6 h-6 text-muted-foreground" />
+            </button>
           </div>
         </div>
 
-        {/* Rest Selection */}
-        <div className="w-full max-w-sm">
-          <div className="flex items-center gap-2 mb-4">
+        {/* Rest Chronometer */}
+        <div className="flex flex-col items-center gap-3">
+          <div className="flex items-center gap-2">
             <Timer className="w-5 h-5 text-accent" />
             <span className="terminal-text text-sm">
               {language === 'es' ? 'TIEMPO DE DESCANSO' : 'REST TIME'}
             </span>
           </div>
-          <div className="grid grid-cols-4 gap-2">
-            {restOptions.map((secs) => (
-              <button
-                key={secs}
-                onClick={() => setRest(secs)}
-                className={cn(
-                  "card-brutal p-3 text-center transition-all",
-                  rest === secs 
-                    ? "bg-accent text-accent-foreground border-accent" 
-                    : "hover:bg-muted"
-                )}
-              >
-                <div className="font-mono text-xl font-bold">{secs}</div>
-                <div className="text-xs uppercase">seg</div>
-              </button>
-            ))}
+
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => cycleRest(-1)}
+              className="p-2 rounded-sm border-2 border-border hover:bg-muted active:scale-95 transition-transform"
+            >
+              <ChevronDown className="w-6 h-6 text-muted-foreground" />
+            </button>
+
+            <div className="card-brutal px-6 py-4 min-w-[160px] text-center bg-card border-accent/30">
+              <div className="font-mono text-4xl font-bold text-accent tracking-wider">
+                {formatRest(rest)}
+              </div>
+              <div className="text-xs text-muted-foreground mt-1 uppercase tracking-widest">
+                {language === 'es' ? 'segundos' : 'seconds'}
+              </div>
+            </div>
+
+            <button
+              onClick={() => cycleRest(1)}
+              className="p-2 rounded-sm border-2 border-border hover:bg-muted active:scale-95 transition-transform"
+            >
+              <ChevronUp className="w-6 h-6 text-muted-foreground" />
+            </button>
           </div>
         </div>
 
@@ -95,16 +142,20 @@ const WorkoutConfig = ({ language, onStart, onCancel }: WorkoutConfigProps) => {
           <div className="text-center text-muted-foreground text-sm mb-2">
             {language === 'es' ? 'Tu rutina:' : 'Your workout:'}
           </div>
-          <div className="text-center">
-            <span className="font-mono text-2xl font-bold text-primary">{duration}</span>
-            <span className="text-muted-foreground mx-2">
-              {language === 'es' ? 'min ejercicio' : 'min exercise'}
-            </span>
-            <span className="text-muted-foreground">+</span>
-            <span className="font-mono text-2xl font-bold text-accent ml-2">{rest}</span>
-            <span className="text-muted-foreground ml-2">
-              {language === 'es' ? 'seg descanso' : 'sec rest'}
-            </span>
+          <div className="text-center flex items-center justify-center gap-3 flex-wrap">
+            <div>
+              <span className="font-mono text-2xl font-bold text-primary">{duration}</span>
+              <span className="text-muted-foreground text-sm ml-1">
+                {language === 'es' ? 'min ejercicio' : 'min exercise'}
+              </span>
+            </div>
+            <span className="text-muted-foreground text-lg">+</span>
+            <div>
+              <span className="font-mono text-2xl font-bold text-accent">{rest}</span>
+              <span className="text-muted-foreground text-sm ml-1">
+                {language === 'es' ? 'seg descanso' : 'sec rest'}
+              </span>
+            </div>
           </div>
         </div>
       </div>
