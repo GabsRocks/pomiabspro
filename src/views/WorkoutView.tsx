@@ -1,20 +1,28 @@
+// PomiABSPro - Unified Workout View (Config + Execution + Completion)
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { exercises } from '@/lib/exercises';
-import { X, Play, Pause, SkipForward, Check, Volume2, VolumeX, ChevronDown, ChevronUp, Flame } from 'lucide-react';
+import {
+  X, Play, Pause, SkipForward, Check, Square,
+  Volume2, VolumeX, ChevronDown, ChevronUp, Flame,
+  Clock, Timer,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useVoiceCoach } from '@/hooks/useVoiceCoach';
-
 import WorkoutTimer from '@/components/WorkoutTimer';
-import WorkoutConfig, { WorkoutSettings } from '@/components/WorkoutConfig';
+import type { WorkoutSettings } from '@/components/WorkoutConfig';
 
 interface WorkoutViewProps {
   onClose: () => void;
 }
 
-// Detailed posture tips per muscle group (bilingual)
+// ── Config options ──
+const durationOptions = [5, 10, 15, 20, 30, 45];
+const restOptions = [15, 20, 30, 45, 60, 90];
+
+// ── Posture tips ──
 const postureTips: Record<string, { en: string; es: string }> = {
   core: {
     en: 'Keep your spine neutral. Engage your abs by pulling your belly button toward your spine. Avoid arching your lower back.',
@@ -66,7 +74,6 @@ const postureTips: Record<string, { en: string; es: string }> = {
   },
 };
 
-// Motivational atmosphere messages that rotate during workout
 const motivationalAtmosphere = {
   es: [
     '🔥 ZONA DE COMBATE — Cada repetición te acerca a tu mejor versión',
@@ -90,17 +97,32 @@ const motivationalAtmosphere = {
   ],
 };
 
+type Phase = 'config' | 'active' | 'complete';
+
 const WorkoutView = ({ onClose }: WorkoutViewProps) => {
   const { state, t, addSession, addReps, language, updateProfile } = useApp();
   const { profile } = state;
   const { preferences, voiceCoachEnabled, voiceVolume = 1.0, name: userName } = profile;
 
-  // Workout configuration state
-  const [isConfiguring, setIsConfiguring] = useState(true);
-  const [workoutSettings, setWorkoutSettings] = useState<WorkoutSettings | null>(null);
+  // ── Phase ──
+  const [phase, setPhase] = useState<Phase>('config');
+
+  // ── Config state ──
+  const [durationIdx, setDurationIdx] = useState(1);
+  const [restIdx, setRestIdx] = useState(2);
+  const duration = durationOptions[durationIdx];
+  const rest = restOptions[restIdx];
+
+  // ── Workout state ──
   const [showPosture, setShowPosture] = useState(true);
   const [showVolumeControl, setShowVolumeControl] = useState(false);
   const [atmosphereIndex, setAtmosphereIndex] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isResting, setIsResting] = useState(false);
+  const [restTime, setRestTime] = useState(0);
+  const [completedReps, setCompletedReps] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+  const [showConfigInline, setShowConfigInline] = useState(false);
 
   const voiceCoach = useVoiceCoach({
     language,
@@ -112,38 +134,47 @@ const WorkoutView = ({ onClose }: WorkoutViewProps) => {
   const hasAnnouncedStart = useRef(false);
   const startTimeRef = useRef<number>(0);
 
-  // Filter exercises based on user preferences
+  // Filter exercises
   const availableExercises = exercises.filter(e =>
     (!preferences.noJumps || !e.requiresJumps) &&
     (!preferences.noFloor || !e.requiresFloor) &&
     (!preferences.noEquipment || !e.requiresEquipment)
   );
 
-  // Pick random exercises for the workout
   const [workoutExercises] = useState(() => {
     const shuffled = [...availableExercises].sort(() => Math.random() - 0.5);
     return shuffled.slice(0, 8);
   });
 
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [isResting, setIsResting] = useState(false);
-  const [restTime, setRestTime] = useState(0);
-  const [completedReps, setCompletedReps] = useState(0);
-  const [isPaused, setIsPaused] = useState(false);
-  const [workoutComplete, setWorkoutComplete] = useState(false);
-
   const currentExercise = workoutExercises[currentIndex];
 
-  // Rotate motivational atmosphere every 8 seconds
-  useEffect(() => {
-    if (isConfiguring || workoutComplete || isResting) return;
-    const interval = setInterval(() => {
-      setAtmosphereIndex(prev => (prev + 1) % motivationalAtmosphere[language].length);
-    }, 8000);
-    return () => clearInterval(interval);
-  }, [isConfiguring, workoutComplete, isResting, language]);
+  // ── Helpers ──
+  const cycleDuration = (dir: 1 | -1) => {
+    setDurationIdx(prev => {
+      const next = prev + dir;
+      if (next < 0) return durationOptions.length - 1;
+      if (next >= durationOptions.length) return 0;
+      return next;
+    });
+  };
 
-  // Get posture tips for current exercise muscles
+  const cycleRest = (dir: 1 | -1) => {
+    setRestIdx(prev => {
+      const next = prev + dir;
+      if (next < 0) return restOptions.length - 1;
+      if (next >= restOptions.length) return 0;
+      return next;
+    });
+  };
+
+  const fmtDuration = (mins: number) => `${mins.toString().padStart(2, '0')}:00`;
+  const fmtRest = (secs: number) => {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  // ── Posture tips ──
   const currentPostureTips = useMemo(() => {
     if (!currentExercise) return [];
     return currentExercise.muscles
@@ -154,82 +185,55 @@ const WorkoutView = ({ onClose }: WorkoutViewProps) => {
       .filter(Boolean) as { muscle: string; text: string }[];
   }, [currentExercise, language]);
 
-  // Handle workout configuration
-  const handleStartWorkout = (settings: WorkoutSettings) => {
-    setWorkoutSettings(settings);
-    setIsConfiguring(false);
+  // ── Start workout ──
+  const handleStart = () => {
+    setPhase('active');
     startTimeRef.current = Date.now();
   };
 
-  // Handle volume change
-  const handleVolumeChange = (value: number[]) => {
-    updateProfile({ voiceVolume: value[0] });
-  };
-
-  // Handle time updates for milestone announcements
-  const handleTimeUpdate = useCallback((elapsedSeconds: number) => {
-    if (voiceCoachEnabled && !isResting && !isPaused) {
-      voiceCoach.checkTimeMilestone(elapsedSeconds);
-    }
-  }, [voiceCoach, voiceCoachEnabled, isResting, isPaused]);
-
-  // Handle target time reached
-  const handleTargetReached = useCallback(() => {
-    if (voiceCoachEnabled) {
-      const name = userName || (language === 'es' ? 'Campeón' : 'Champion');
-      const message = language === 'es'
-        ? `¡${name}, completaste tu tiempo objetivo! ¡Increíble trabajo!`
-        : `${name}, you hit your target time! Incredible work!`;
-      voiceCoach.speak(message);
-    }
-  }, [voiceCoach, voiceCoachEnabled, userName, language]);
-
-  // Reset milestones when starting new workout
+  // ── Atmosphere rotation ──
   useEffect(() => {
-    if (!isConfiguring) {
-      voiceCoach.resetMilestones();
-    }
-  }, [isConfiguring]);
+    if (phase !== 'active' || isResting) return;
+    const interval = setInterval(() => {
+      setAtmosphereIndex(prev => (prev + 1) % motivationalAtmosphere[language].length);
+    }, 8000);
+    return () => clearInterval(interval);
+  }, [phase, isResting, language]);
 
-  // Announce first exercise on mount + total reps summary
+  // ── Voice: announce start ──
   useEffect(() => {
-    if (!isConfiguring && !hasAnnouncedStart.current && currentExercise && voiceCoachEnabled) {
-      hasAnnouncedStart.current = true;
-      const exerciseName = language === 'es' ? currentExercise.nameEs : currentExercise.name;
-      const totalExercises = workoutExercises.length;
-      const totalRepsEstimate = workoutExercises.reduce((sum, e) => sum + e.reps * e.sets, 0);
+    if (phase !== 'active' || hasAnnouncedStart.current || !currentExercise || !voiceCoachEnabled) return;
+    hasAnnouncedStart.current = true;
+    const exerciseName = language === 'es' ? currentExercise.nameEs : currentExercise.name;
+    const totalExercises = workoutExercises.length;
+    const totalRepsEstimate = workoutExercises.reduce((sum, e) => sum + e.reps * e.sets, 0);
+    setTimeout(() => {
+      const intro = language === 'es'
+        ? `¡Vamos! ${totalExercises} ejercicios, aproximadamente ${totalRepsEstimate} repeticiones en total.`
+        : `Let's go! ${totalExercises} exercises, approximately ${totalRepsEstimate} total reps.`;
+      voiceCoach.speak(intro);
       setTimeout(() => {
-        const intro = language === 'es'
-          ? `¡Vamos! ${totalExercises} ejercicios, aproximadamente ${totalRepsEstimate} repeticiones en total.`
-          : `Let's go! ${totalExercises} exercises, approximately ${totalRepsEstimate} total reps.`;
-        voiceCoach.speak(intro);
-        setTimeout(() => {
-          voiceCoach.announceStart(exerciseName, currentExercise.reps, currentExercise.sets);
-        }, 3000);
-      }, 500);
-    }
-  }, [isConfiguring, currentExercise, voiceCoach, voiceCoachEnabled, language, workoutExercises]);
+        voiceCoach.announceStart(exerciseName, currentExercise.reps, currentExercise.sets);
+      }, 3000);
+    }, 500);
+  }, [phase, currentExercise, voiceCoach, voiceCoachEnabled, language, workoutExercises]);
 
-  // Motivational phrases every 5 seconds during active exercise
+  // ── Motivational loop ──
   useEffect(() => {
-    if (!isConfiguring && !isResting && !isPaused && voiceCoachEnabled) {
+    if (phase === 'active' && !isResting && !isPaused && voiceCoachEnabled) {
       voiceCoach.startMotivationalLoop(5);
     } else {
       voiceCoach.stopMotivationalLoop();
     }
+    return () => { voiceCoach.stopMotivationalLoop(); };
+  }, [phase, isResting, isPaused, voiceCoachEnabled, voiceCoach]);
 
-    return () => {
-      voiceCoach.stopMotivationalLoop();
-    };
-  }, [isConfiguring, isResting, isPaused, voiceCoachEnabled, voiceCoach]);
-
-  // Rest timer with voice countdown at key moments
+  // ── Rest timer ──
   useEffect(() => {
     if (isResting && restTime > 0 && !isPaused) {
       const timer = setTimeout(() => {
         const newTime = restTime - 1;
         setRestTime(newTime);
-        // Voice countdown for last 3 seconds
         if (newTime <= 3 && newTime > 0 && voiceCoachEnabled) {
           voiceCoach.speak(`${newTime}`);
         }
@@ -240,7 +244,6 @@ const WorkoutView = ({ onClose }: WorkoutViewProps) => {
       if (currentIndex < workoutExercises.length - 1) {
         const nextIdx = currentIndex + 1;
         setCurrentIndex(nextIdx);
-        // Announce next exercise
         if (voiceCoachEnabled) {
           const next = workoutExercises[nextIdx];
           const nextName = language === 'es' ? next.nameEs : next.name;
@@ -250,27 +253,49 @@ const WorkoutView = ({ onClose }: WorkoutViewProps) => {
     }
   }, [isResting, restTime, isPaused, currentIndex, workoutExercises, voiceCoachEnabled, voiceCoach, language]);
 
+  const handleVolumeChange = (value: number[]) => {
+    updateProfile({ voiceVolume: value[0] });
+  };
+
+  const handleTimeUpdate = useCallback((elapsedSeconds: number) => {
+    if (voiceCoachEnabled && !isResting && !isPaused) {
+      voiceCoach.checkTimeMilestone(elapsedSeconds);
+    }
+  }, [voiceCoach, voiceCoachEnabled, isResting, isPaused]);
+
+  const handleTargetReached = useCallback(() => {
+    if (voiceCoachEnabled) {
+      const name = userName || (language === 'es' ? 'Campeón' : 'Champion');
+      const msg = language === 'es'
+        ? `¡${name}, completaste tu tiempo objetivo! ¡Increíble trabajo!`
+        : `${name}, you hit your target time! Incredible work!`;
+      voiceCoach.speak(msg);
+    }
+  }, [voiceCoach, voiceCoachEnabled, userName, language]);
+
+  useEffect(() => {
+    if (phase === 'active') voiceCoach.resetMilestones();
+  }, [phase]);
+
+  // ── Exercise complete ──
   const handleComplete = () => {
     const reps = currentExercise.reps * currentExercise.sets;
-    setCompletedReps(completedReps + reps);
+    setCompletedReps(prev => prev + reps);
     addReps(reps, currentExercise.muscles[0]);
     voiceCoach.stopMotivationalLoop();
     setIsPaused(false);
 
-    // Voice: announce exercise done
     if (voiceCoachEnabled) {
-      const name = language === 'es' ? '¡Ejercicio completado!' : 'Exercise complete!';
-      voiceCoach.speak(name);
+      voiceCoach.speak(language === 'es' ? '¡Ejercicio completado!' : 'Exercise complete!');
     }
 
     if (currentIndex < workoutExercises.length - 1) {
       setIsResting(true);
-      setRestTime(workoutSettings?.restSeconds || 30);
-      
+      setRestTime(rest);
       setTimeout(() => {
         const nextExercise = workoutExercises[currentIndex + 1];
         const nextName = language === 'es' ? nextExercise.nameEs : nextExercise.name;
-        voiceCoach.announceRest(workoutSettings?.restSeconds || 30, nextName);
+        voiceCoach.announceRest(rest, nextName);
       }, 1500);
     } else {
       finishWorkout();
@@ -278,9 +303,8 @@ const WorkoutView = ({ onClose }: WorkoutViewProps) => {
   };
 
   const finishWorkout = () => {
-    setWorkoutComplete(true);
+    setPhase('complete');
     voiceCoach.announceEnd();
-    
     const durationMinutes = Math.round((Date.now() - startTimeRef.current) / 60000);
     addSession({
       date: new Date().toISOString(),
@@ -293,8 +317,6 @@ const WorkoutView = ({ onClose }: WorkoutViewProps) => {
       durationMinutes: Math.max(1, durationMinutes),
       mode: 'guided',
     });
-    
-    setTimeout(() => onClose(), 3000);
   };
 
   const handleSkip = () => {
@@ -309,297 +331,407 @@ const WorkoutView = ({ onClose }: WorkoutViewProps) => {
     }
   };
 
+  const handleSkipRest = () => {
+    setIsResting(false);
+    if (currentIndex < workoutExercises.length - 1) {
+      const nextIdx = currentIndex + 1;
+      setCurrentIndex(nextIdx);
+      if (voiceCoachEnabled) {
+        const next = workoutExercises[nextIdx];
+        const nextName = language === 'es' ? next.nameEs : next.name;
+        voiceCoach.announceExercise(nextName, next.reps);
+      }
+    }
+  };
+
+  const handleStop = () => {
+    voiceCoach.stopSpeaking();
+    if (phase === 'active' && completedReps > 0) {
+      finishWorkout();
+    } else {
+      onClose();
+    }
+  };
+
+  const togglePause = () => {
+    const wasPaused = isPaused;
+    setIsPaused(!isPaused);
+    if (voiceCoachEnabled) {
+      if (wasPaused) {
+        voiceCoach.speak(language === 'es' ? '¡Vamos, continúa!' : "Let's go, continue!");
+      } else {
+        voiceCoach.speak(language === 'es' ? 'Pausa' : 'Pause');
+      }
+    }
+  };
+
   const handleClose = () => {
     voiceCoach.stopSpeaking();
     onClose();
   };
 
-  // Show configuration screen first
-  if (isConfiguring) {
-    return (
-      <WorkoutConfig
-        language={language}
-        onStart={handleStartWorkout}
-        onCancel={onClose}
-      />
-    );
-  }
+  const progress = phase === 'active'
+    ? ((currentIndex + (isResting ? 1 : 0)) / workoutExercises.length) * 100
+    : phase === 'complete' ? 100 : 0;
 
-  const progress = ((currentIndex + (isResting ? 1 : 0)) / workoutExercises.length) * 100;
+  const totalRepsEstimate = workoutExercises.reduce((sum, e) => sum + e.reps * e.sets, 0);
 
-  // Workout complete screen
-  if (workoutComplete) {
-    return (
-      <div className="fixed inset-0 bg-background z-50 flex flex-col items-center justify-center p-6">
-        <div className="text-center animate-fade-in">
-          <div className="text-6xl mb-4">🏆</div>
-          <h1 className="terminal-text text-2xl mb-4">
-            {language === 'es' ? '¡RUTINA COMPLETADA!' : 'WORKOUT COMPLETE!'}
-          </h1>
-          <div className="font-mono text-4xl font-bold text-primary mb-2">
-            {completedReps}
-          </div>
-          <div className="text-muted-foreground">
-            {language === 'es' ? 'repeticiones totales' : 'total reps'}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
+  // ══════════════════════════════════════════════════════════
+  // RENDER
+  // ══════════════════════════════════════════════════════════
   return (
     <div className="fixed inset-0 bg-background z-50 flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b-2 border-border">
+      {/* ── HEADER ── */}
+      <div className="flex items-center justify-between p-3 border-b-2 border-border">
         <button onClick={handleClose} className="p-2 hover:bg-muted rounded-sm">
-          <X className="w-6 h-6" />
+          <X className="w-5 h-5" />
         </button>
-        
-        <WorkoutTimer 
-          isActive={!isResting && !isPaused}
-          targetMinutes={workoutSettings?.durationMinutes}
-          onTimeUpdate={handleTimeUpdate}
-          onTargetReached={handleTargetReached}
-        />
-        
-        <div className="flex items-center gap-3">
-          {/* Volume toggle */}
-          <button
-            onClick={() => setShowVolumeControl(!showVolumeControl)}
-            className="p-1 hover:bg-muted rounded-sm"
-          >
-            {voiceCoachEnabled ? (
-              <Volume2 className="w-4 h-4 text-primary" />
-            ) : (
-              <VolumeX className="w-4 h-4 text-muted-foreground" />
-            )}
-          </button>
-          <div className="terminal-text text-xs">
-            {currentIndex + 1}/{workoutExercises.length}
-          </div>
+
+        {phase === 'active' && (
+          <WorkoutTimer
+            isActive={!isResting && !isPaused}
+            targetMinutes={duration}
+            onTimeUpdate={handleTimeUpdate}
+            onTargetReached={handleTargetReached}
+          />
+        )}
+
+        <div className="flex items-center gap-2">
+          {phase === 'active' && (
+            <>
+              <button
+                onClick={() => setShowVolumeControl(!showVolumeControl)}
+                className="p-1 hover:bg-muted rounded-sm"
+              >
+                {voiceCoachEnabled ? <Volume2 className="w-4 h-4 text-primary" /> : <VolumeX className="w-4 h-4 text-muted-foreground" />}
+              </button>
+              <span className="terminal-text text-xs">{currentIndex + 1}/{workoutExercises.length}</span>
+              <span className="font-mono text-primary text-xs">{completedReps} reps</span>
+            </>
+          )}
         </div>
-        
-        <div className="font-mono text-primary text-sm">{completedReps} reps</div>
       </div>
 
-      {/* Volume Slider (collapsible) */}
-      {showVolumeControl && (
-        <div className="px-4 py-3 border-b border-border bg-card animate-fade-in">
+      {/* Volume slider */}
+      {showVolumeControl && phase === 'active' && (
+        <div className="px-4 py-2 border-b border-border bg-card">
           <div className="max-w-sm mx-auto flex items-center gap-3">
-            <VolumeX className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-            <Slider
-              value={[voiceVolume]}
-              onValueChange={handleVolumeChange}
-              min={0}
-              max={1}
-              step={0.1}
-              className="flex-1"
-            />
-            <Volume2 className="w-4 h-4 text-primary flex-shrink-0" />
-            <span className="font-mono text-xs text-muted-foreground w-10 text-right">
-              {Math.round(voiceVolume * 100)}%
-            </span>
+            <VolumeX className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+            <Slider value={[voiceVolume]} onValueChange={handleVolumeChange} min={0} max={1} step={0.1} className="flex-1" />
+            <Volume2 className="w-3 h-3 text-primary flex-shrink-0" />
+            <span className="font-mono text-xs text-muted-foreground w-8 text-right">{Math.round(voiceVolume * 100)}%</span>
           </div>
-          <p className="text-center text-xs text-muted-foreground mt-1">
-            {language === 'es' ? 'Sube el volumen para escuchar sobre tu música' : 'Turn up to hear over your music'}
-          </p>
         </div>
       )}
 
-      {/* Progress */}
-      <div className="progress-military h-2">
-        <div
-          className="progress-military-fill"
-          style={{ width: `${progress}%` }}
-        />
+      {/* Progress bar */}
+      <div className="progress-military h-1.5">
+        <div className="progress-military-fill" style={{ width: `${progress}%` }} />
       </div>
 
-      {/* Motivational Atmosphere Banner */}
-      {!isResting && (
-        <div className="px-4 py-2 bg-primary/10 border-b border-primary/20">
-          <p className="text-center text-xs font-bold text-primary tracking-wider animate-fade-in" key={atmosphereIndex}>
+      {/* Motivational banner */}
+      {phase === 'active' && !isResting && (
+        <div className="px-4 py-1.5 bg-primary/10 border-b border-primary/20">
+          <p className="text-center text-xs font-bold text-primary tracking-wider" key={atmosphereIndex}>
             {motivationalAtmosphere[language][atmosphereIndex]}
           </p>
         </div>
       )}
 
-      {/* Content */}
-      <div className="flex-1 flex flex-col items-center justify-center p-6 overflow-auto">
-        {isResting ? (
-          <div className="text-center animate-fade-in">
-            <div className="terminal-text mb-4">
-              {language === 'es' ? 'DESCANSO' : 'REST'}
-            </div>
-            <div className="metric-display text-accent mb-8">{restTime}</div>
-            
-            {/* Next exercise preview with posture info */}
-            {workoutExercises[currentIndex + 1] && (() => {
-              const next = workoutExercises[currentIndex + 1];
-              const nextName = language === 'es' ? next.nameEs : next.name;
-              const nextInstructions = language === 'es' ? next.instructionsEs : next.instructions;
-              return (
-                <div className="space-y-3 max-w-sm">
-                  <div className="text-muted-foreground text-sm">
-                    {language === 'es' ? 'Siguiente:' : 'Next:'}
-                  </div>
-                  <div className="font-bold text-lg">{nextName}</div>
-                  <div className="card-brutal p-3 text-left">
-                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">
-                      {language === 'es' ? '📋 Postura:' : '📋 Form:'}
-                    </p>
-                    <p className="text-sm">{nextInstructions}</p>
-                  </div>
-                  <p className="text-xs text-muted-foreground italic">
-                    {language === 'es'
-                      ? '💡 Prepara tu posición mientras descansas'
-                      : '💡 Get into position while you rest'}
-                  </p>
+      {/* ══ MAIN CONTENT ══ */}
+      <div className="flex-1 overflow-auto">
+        {/* ── CONFIG PHASE ── */}
+        {phase === 'config' && (
+          <div className="flex flex-col items-center justify-center h-full p-4 gap-6">
+            <h1 className="terminal-text text-lg text-center">
+              {language === 'es' ? '⚡ CONFIGURAR RUTINA' : '⚡ CONFIGURE WORKOUT'}
+            </h1>
+
+            {/* Chronometers side by side on larger, stacked on small */}
+            <div className="flex flex-col sm:flex-row gap-6 items-center">
+              {/* Duration chronometer */}
+              <div className="flex flex-col items-center gap-2">
+                <div className="flex items-center gap-1.5">
+                  <Clock className="w-4 h-4 text-primary" />
+                  <span className="terminal-text text-xs">{language === 'es' ? 'EJERCICIO' : 'EXERCISE'}</span>
                 </div>
-              );
-            })()}
-          </div>
-        ) : (
-          <div className="text-center animate-fade-in w-full max-w-sm">
-            
-            <h2 className="text-2xl font-bold mb-2">
-              {language === 'es' ? currentExercise.nameEs : currentExercise.name}
-            </h2>
+                <div className="flex items-center gap-3">
+                  <button onClick={() => cycleDuration(-1)} className="p-1.5 rounded-sm border-2 border-border hover:bg-muted active:scale-95 transition-transform">
+                    <ChevronDown className="w-5 h-5 text-muted-foreground" />
+                  </button>
+                  <div className="card-brutal px-5 py-3 min-w-[140px] text-center bg-card border-primary/30">
+                    <div className="font-mono text-3xl font-bold text-primary tracking-wider">{fmtDuration(duration)}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5 uppercase tracking-widest">{language === 'es' ? 'min' : 'min'}</div>
+                  </div>
+                  <button onClick={() => cycleDuration(1)} className="p-1.5 rounded-sm border-2 border-border hover:bg-muted active:scale-95 transition-transform">
+                    <ChevronUp className="w-5 h-5 text-muted-foreground" />
+                  </button>
+                </div>
+              </div>
 
-            {/* Detailed instructions */}
-            <div className="card-brutal p-3 mb-4 text-left">
-              <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1 flex items-center gap-1">
-                <Flame className="w-3 h-3" />
-                {language === 'es' ? 'CÓMO HACERLO' : 'HOW TO DO IT'}
-              </p>
-              <p className="text-sm">
-                {language === 'es' ? currentExercise.instructionsEs : currentExercise.instructions}
-              </p>
+              {/* Rest chronometer */}
+              <div className="flex flex-col items-center gap-2">
+                <div className="flex items-center gap-1.5">
+                  <Timer className="w-4 h-4 text-accent" />
+                  <span className="terminal-text text-xs">{language === 'es' ? 'DESCANSO' : 'REST'}</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button onClick={() => cycleRest(-1)} className="p-1.5 rounded-sm border-2 border-border hover:bg-muted active:scale-95 transition-transform">
+                    <ChevronDown className="w-5 h-5 text-muted-foreground" />
+                  </button>
+                  <div className="card-brutal px-5 py-3 min-w-[140px] text-center bg-card border-accent/30">
+                    <div className="font-mono text-3xl font-bold text-accent tracking-wider">{fmtRest(rest)}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5 uppercase tracking-widest">{language === 'es' ? 'seg' : 'sec'}</div>
+                  </div>
+                  <button onClick={() => cycleRest(1)} className="p-1.5 rounded-sm border-2 border-border hover:bg-muted active:scale-95 transition-transform">
+                    <ChevronUp className="w-5 h-5 text-muted-foreground" />
+                  </button>
+                </div>
+              </div>
             </div>
 
-            {/* Posture tips (collapsible) */}
-            {currentPostureTips.length > 0 && (
-              <div className="mb-4">
-                <button
-                  onClick={() => setShowPosture(!showPosture)}
-                  className="flex items-center gap-1 mx-auto text-xs text-primary uppercase tracking-wider mb-2"
-                >
-                  {language === 'es' ? '🎯 Tips de Postura' : '🎯 Posture Tips'}
-                  {showPosture ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                </button>
-                {showPosture && (
-                  <div className="space-y-2 animate-fade-in">
-                    {currentPostureTips.map(({ muscle, text }) => (
-                      <div key={muscle} className="bg-primary/5 border border-primary/20 rounded-sm p-2 text-left">
-                        <span className="text-xs font-bold text-primary uppercase">{muscle}: </span>
-                        <span className="text-xs text-foreground">{text}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+            {/* Summary preview */}
+            <div className="card-brutal p-3 w-full max-w-sm">
+              <div className="text-center text-muted-foreground text-xs mb-1.5">
+                {language === 'es' ? 'Tu rutina:' : 'Your workout:'}
+              </div>
+              <div className="text-center flex items-center justify-center gap-3 flex-wrap text-sm">
+                <div>
+                  <span className="font-mono text-xl font-bold text-primary">{duration}</span>
+                  <span className="text-muted-foreground text-xs ml-1">{language === 'es' ? 'min' : 'min'}</span>
+                </div>
+                <span className="text-muted-foreground">+</span>
+                <div>
+                  <span className="font-mono text-xl font-bold text-accent">{rest}</span>
+                  <span className="text-muted-foreground text-xs ml-1">{language === 'es' ? 'seg desc' : 'sec rest'}</span>
+                </div>
+                <span className="text-muted-foreground">•</span>
+                <div>
+                  <span className="font-mono text-xl font-bold text-foreground">{workoutExercises.length}</span>
+                  <span className="text-muted-foreground text-xs ml-1">{language === 'es' ? 'ejercicios' : 'exercises'}</span>
+                </div>
+              </div>
+              <div className="text-center text-xs text-muted-foreground mt-1.5">
+                ~{totalRepsEstimate} {language === 'es' ? 'repeticiones estimadas' : 'estimated reps'}
+              </div>
+            </div>
+
+            {/* Exercise preview list */}
+            <div className="w-full max-w-sm space-y-1">
+              <div className="terminal-text text-xs mb-1">{language === 'es' ? 'EJERCICIOS:' : 'EXERCISES:'}</div>
+              {workoutExercises.map((ex, i) => (
+                <div key={ex.id} className="flex items-center gap-2 text-xs px-2 py-1.5 bg-secondary/50 rounded-sm">
+                  <span className="font-mono text-muted-foreground w-5">{(i + 1).toString().padStart(2, '0')}</span>
+                  <span className="flex-1 truncate">{language === 'es' ? ex.nameEs : ex.name}</span>
+                  <span className="text-primary font-mono">{ex.reps}×{ex.sets}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── ACTIVE PHASE ── */}
+        {phase === 'active' && (
+          <div className="flex flex-col items-center p-4 gap-4">
+            {/* Inline config toggle */}
+            <button
+              onClick={() => setShowConfigInline(!showConfigInline)}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+            >
+              <Clock className="w-3 h-3" />
+              <span className="font-mono">{duration}min</span>
+              <span className="text-muted-foreground mx-1">|</span>
+              <Timer className="w-3 h-3" />
+              <span className="font-mono">{rest}s</span>
+              {showConfigInline ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            </button>
+
+            {showConfigInline && (
+              <div className="flex gap-4 items-center bg-card border border-border rounded-sm p-3 animate-fade-in">
+                <div className="flex items-center gap-2">
+                  <button onClick={() => cycleDuration(-1)} className="p-1 border border-border rounded-sm"><ChevronDown className="w-3 h-3" /></button>
+                  <span className="font-mono text-sm text-primary font-bold">{fmtDuration(duration)}</span>
+                  <button onClick={() => cycleDuration(1)} className="p-1 border border-border rounded-sm"><ChevronUp className="w-3 h-3" /></button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => cycleRest(-1)} className="p-1 border border-border rounded-sm"><ChevronDown className="w-3 h-3" /></button>
+                  <span className="font-mono text-sm text-accent font-bold">{fmtRest(rest)}</span>
+                  <button onClick={() => cycleRest(1)} className="p-1 border border-border rounded-sm"><ChevronUp className="w-3 h-3" /></button>
+                </div>
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div className="card-brutal p-4 text-center">
-                <div className="terminal-text mb-1 text-xs">REPS</div>
-                <div className="font-mono text-3xl font-bold text-primary">
-                  {currentExercise.reps}
-                </div>
-              </div>
-              <div className="card-brutal p-4 text-center">
-                <div className="terminal-text mb-1 text-xs">SETS</div>
-                <div className="font-mono text-3xl font-bold text-accent">
-                  {currentExercise.sets}
-                </div>
-              </div>
-            </div>
+            {isResting ? (
+              /* ── REST SCREEN ── */
+              <div className="text-center w-full max-w-sm">
+                <div className="terminal-text mb-2">{language === 'es' ? 'DESCANSO' : 'REST'}</div>
+                <div className="metric-display text-accent mb-4">{restTime}</div>
 
-            {/* Muscles */}
-            <div className="flex gap-2 justify-center flex-wrap">
-              {currentExercise.muscles.map((muscle) => (
-                <span
-                  key={muscle}
-                  className="text-xs uppercase tracking-wider px-2 py-1 bg-secondary text-muted-foreground border border-border"
-                >
-                  {muscle}
-                </span>
-              ))}
+                {workoutExercises[currentIndex + 1] && (() => {
+                  const next = workoutExercises[currentIndex + 1];
+                  const nextName = language === 'es' ? next.nameEs : next.name;
+                  const nextInstructions = language === 'es' ? next.instructionsEs : next.instructions;
+                  return (
+                    <div className="space-y-2">
+                      <div className="text-muted-foreground text-xs">{language === 'es' ? 'Siguiente:' : 'Next:'}</div>
+                      <div className="font-bold text-base">{nextName}</div>
+                      <div className="card-brutal p-2 text-left">
+                        <p className="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">📋 {language === 'es' ? 'Postura:' : 'Form:'}</p>
+                        <p className="text-xs">{nextInstructions}</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground italic">
+                        💡 {language === 'es' ? 'Prepara tu posición' : 'Get into position'}
+                      </p>
+                    </div>
+                  );
+                })()}
+              </div>
+            ) : (
+              /* ── EXERCISE SCREEN ── */
+              <div className="text-center w-full max-w-sm">
+                <h2 className="text-xl font-bold mb-2">
+                  {language === 'es' ? currentExercise.nameEs : currentExercise.name}
+                </h2>
+
+                {/* Instructions */}
+                <div className="card-brutal p-2.5 mb-3 text-left">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-0.5 flex items-center gap-1">
+                    <Flame className="w-3 h-3" />
+                    {language === 'es' ? 'CÓMO HACERLO' : 'HOW TO DO IT'}
+                  </p>
+                  <p className="text-sm">{language === 'es' ? currentExercise.instructionsEs : currentExercise.instructions}</p>
+                </div>
+
+                {/* Posture tips */}
+                {currentPostureTips.length > 0 && (
+                  <div className="mb-3">
+                    <button
+                      onClick={() => setShowPosture(!showPosture)}
+                      className="flex items-center gap-1 mx-auto text-xs text-primary uppercase tracking-wider mb-1.5"
+                    >
+                      🎯 {language === 'es' ? 'Tips de Postura' : 'Posture Tips'}
+                      {showPosture ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                    </button>
+                    {showPosture && (
+                      <div className="space-y-1.5">
+                        {currentPostureTips.map(({ muscle, text }) => (
+                          <div key={muscle} className="bg-primary/5 border border-primary/20 rounded-sm p-2 text-left">
+                            <span className="text-xs font-bold text-primary uppercase">{muscle}: </span>
+                            <span className="text-xs">{text}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Reps & Sets */}
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  <div className="card-brutal p-3 text-center">
+                    <div className="terminal-text mb-0.5 text-xs">REPS</div>
+                    <div className="font-mono text-2xl font-bold text-primary">{currentExercise.reps}</div>
+                  </div>
+                  <div className="card-brutal p-3 text-center">
+                    <div className="terminal-text mb-0.5 text-xs">SETS</div>
+                    <div className="font-mono text-2xl font-bold text-accent">{currentExercise.sets}</div>
+                  </div>
+                </div>
+
+                {/* Muscles */}
+                <div className="flex gap-1.5 justify-center flex-wrap">
+                  {currentExercise.muscles.map(muscle => (
+                    <span key={muscle} className="text-xs uppercase tracking-wider px-2 py-0.5 bg-secondary text-muted-foreground border border-border">
+                      {muscle}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── COMPLETE PHASE ── */}
+        {phase === 'complete' && (
+          <div className="flex flex-col items-center justify-center h-full p-6">
+            <div className="text-center space-y-4">
+              <div className="text-6xl">🏆</div>
+              <h1 className="terminal-text text-xl">
+                {language === 'es' ? '¡RUTINA COMPLETADA!' : 'WORKOUT COMPLETE!'}
+              </h1>
+              <div className="font-mono text-5xl font-bold text-primary">{completedReps}</div>
+              <div className="text-muted-foreground text-sm">
+                {language === 'es' ? 'repeticiones totales' : 'total reps'}
+              </div>
+              <div className="grid grid-cols-2 gap-3 max-w-xs mx-auto mt-4">
+                <div className="card-brutal p-3 text-center">
+                  <div className="terminal-text text-xs mb-0.5">{language === 'es' ? 'EJERCICIOS' : 'EXERCISES'}</div>
+                  <div className="font-mono text-xl font-bold text-foreground">{currentIndex + 1}</div>
+                </div>
+                <div className="card-brutal p-3 text-center">
+                  <div className="terminal-text text-xs mb-0.5">{language === 'es' ? 'TIEMPO' : 'TIME'}</div>
+                  <div className="font-mono text-xl font-bold text-accent">
+                    {Math.max(1, Math.round((Date.now() - startTimeRef.current) / 60000))} min
+                  </div>
+                </div>
+              </div>
+              <Button onClick={onClose} className="btn-military mt-4 h-12 px-8">
+                {language === 'es' ? 'CERRAR' : 'CLOSE'}
+              </Button>
             </div>
           </div>
         )}
       </div>
 
-      {/* Controls */}
-      <div className="p-4 border-t-2 border-border">
-        <div className="flex gap-3 max-w-sm mx-auto">
-          {isResting ? (
-            <>
-              <Button
-                onClick={() => setIsPaused(!isPaused)}
-                variant="outline"
-                className="flex-1 h-14 border-2"
-              >
-                {isPaused ? <Play className="w-5 h-5 mr-2" /> : <Pause className="w-5 h-5 mr-2" />}
-                {isPaused 
-                  ? (language === 'es' ? 'CONTINUAR' : 'RESUME') 
-                  : (language === 'es' ? 'PAUSA' : 'PAUSE')}
-              </Button>
-              <Button
-                onClick={() => {
-                  setIsResting(false);
-                  if (currentIndex < workoutExercises.length - 1) {
-                    const nextIdx = currentIndex + 1;
-                    setCurrentIndex(nextIdx);
-                    if (voiceCoachEnabled) {
-                      const next = workoutExercises[nextIdx];
-                      const nextName = language === 'es' ? next.nameEs : next.name;
-                      voiceCoach.announceExercise(nextName, next.reps);
-                    }
-                  }
-                }}
-                className="flex-1 h-14 btn-military"
-              >
-                <SkipForward className="w-5 h-5 mr-2" />
-                {language === 'es' ? 'SIGUIENTE' : 'NEXT'}
-              </Button>
-            </>
-          ) : (
-            <>
-              {/* Pause / Resume during exercise */}
-              <Button
-                onClick={() => {
-                  const wasPaused = isPaused;
-                  setIsPaused(!isPaused);
-                  if (voiceCoachEnabled && wasPaused) {
-                    voiceCoach.speak(language === 'es' ? '¡Vamos, continúa!' : "Let's go, continue!");
-                  } else if (voiceCoachEnabled && !wasPaused) {
-                    voiceCoach.speak(language === 'es' ? 'Pausa' : 'Pause');
-                  }
-                }}
-                variant="outline"
-                className="h-14 px-5 border-2"
-              >
-                {isPaused ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
-              </Button>
-              <Button
-                onClick={handleComplete}
-                className="flex-1 h-14 btn-military"
-              >
-                <Check className="w-5 h-5 mr-2" />
-                {t.common.complete}
-              </Button>
-              <Button
-                onClick={handleSkip}
-                variant="outline"
-                className="h-14 px-5 border-2"
-              >
-                <SkipForward className="w-5 h-5" />
-              </Button>
-            </>
-
-          )}
+      {/* ══ CONTROLS ══ */}
+      {phase !== 'complete' && (
+        <div className="p-3 border-t-2 border-border">
+          <div className="flex gap-2 max-w-sm mx-auto">
+            {phase === 'config' ? (
+              /* Config controls */
+              <>
+                <Button onClick={onClose} variant="outline" className="flex-1 h-12 border-2">
+                  {language === 'es' ? 'CANCELAR' : 'CANCEL'}
+                </Button>
+                <Button onClick={handleStart} className="flex-1 h-12 btn-military">
+                  <Play className="w-5 h-5 mr-2" />
+                  {language === 'es' ? 'COMENZAR' : 'START'}
+                </Button>
+              </>
+            ) : isResting ? (
+              /* Rest controls */
+              <>
+                <Button onClick={togglePause} variant="outline" className="h-12 px-4 border-2">
+                  {isPaused ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
+                </Button>
+                <Button onClick={handleSkipRest} className="flex-1 h-12 btn-military">
+                  <SkipForward className="w-5 h-5 mr-2" />
+                  {language === 'es' ? 'SIGUIENTE' : 'NEXT'}
+                </Button>
+                <Button onClick={handleStop} variant="outline" className="h-12 px-4 border-2 text-destructive border-destructive/50 hover:bg-destructive/10">
+                  <Square className="w-4 h-4" />
+                </Button>
+              </>
+            ) : (
+              /* Exercise controls */
+              <>
+                <Button onClick={togglePause} variant="outline" className="h-12 px-4 border-2">
+                  {isPaused ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
+                </Button>
+                <Button onClick={handleComplete} className="flex-1 h-12 btn-military">
+                  <Check className="w-5 h-5 mr-2" />
+                  {t.common.complete}
+                </Button>
+                <Button onClick={handleSkip} variant="outline" className="h-12 px-4 border-2">
+                  <SkipForward className="w-4 h-4" />
+                </Button>
+                <Button onClick={handleStop} variant="outline" className="h-12 px-4 border-2 text-destructive border-destructive/50 hover:bg-destructive/10">
+                  <Square className="w-4 h-4" />
+                </Button>
+              </>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
