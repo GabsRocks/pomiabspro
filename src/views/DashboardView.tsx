@@ -1,16 +1,35 @@
 import { useApp } from '@/contexts/AppContext';
 import MetricCard from '@/components/MetricCard';
-import { Flame, Calendar, Zap, Play } from 'lucide-react';
+import { Flame, Calendar, Zap, Play, AlertTriangle, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { challenges } from '@/lib/challenges';
+import { loadPausedWorkout, clearPausedWorkout, PausedWorkout } from '@/lib/pausedWorkout';
+import { useState, useEffect } from 'react';
 
 interface DashboardViewProps {
   onStartWorkout: () => void;
+  onResumeWorkout: (data: PausedWorkout) => void;
 }
 
-const DashboardView = ({ onStartWorkout }: DashboardViewProps) => {
+const DashboardView = ({ onStartWorkout, onResumeWorkout }: DashboardViewProps) => {
   const { state, t } = useApp();
   const { metrics, activeChallenge } = state;
+  const [pausedWorkout, setPausedWorkout] = useState<PausedWorkout | null>(null);
+
+  useEffect(() => {
+    setPausedWorkout(loadPausedWorkout());
+  }, []);
+
+  const handleDiscard = () => {
+    clearPausedWorkout();
+    setPausedWorkout(null);
+  };
+
+  const handleResume = () => {
+    if (pausedWorkout) {
+      onResumeWorkout(pausedWorkout);
+    }
+  };
 
   const activeC = activeChallenge
     ? challenges.find(c => c.id === activeChallenge)
@@ -32,7 +51,33 @@ const DashboardView = ({ onStartWorkout }: DashboardViewProps) => {
         <p className="text-muted-foreground">{t.dashboard.greeting}</p>
       </div>
 
-      {/* Main CTA */}
+      {/* Paused Workout Banner */}
+      {pausedWorkout && (
+        <div className="mb-6 border-2 border-accent bg-accent/10 p-4 rounded-sm">
+          <div className="flex items-center gap-2 mb-2">
+            <AlertTriangle className="w-5 h-5 text-accent" />
+            <span className="font-bold text-accent">
+              {state.profile.language === 'es' ? 'Rutina en pausa' : 'Paused workout'}
+            </span>
+          </div>
+          <p className="text-sm text-muted-foreground mb-3">
+            {state.profile.language === 'es'
+              ? `Tienes una rutina pendiente (${new Date(pausedWorkout.pausedAt).toLocaleString('es-MX', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })}). ¿Deseas continuar o iniciar una nueva?`
+              : `You have a pending workout (${new Date(pausedWorkout.pausedAt).toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })}). Continue or start a new one?`}
+          </p>
+          <div className="flex gap-2">
+            <Button onClick={handleResume} className="flex-1 btn-military rounded-sm">
+              <Play className="w-4 h-4 mr-1" />
+              {state.profile.language === 'es' ? 'Continuar' : 'Continue'}
+            </Button>
+            <Button onClick={handleDiscard} variant="outline" className="flex-1 rounded-sm border-2">
+              <Trash2 className="w-4 h-4 mr-1" />
+              {state.profile.language === 'es' ? 'Eliminar' : 'Discard'}
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="card-active p-6 mb-6">
         <div className="text-center">
           <div className="terminal-text mb-2">{t.dashboard.todayTarget}</div>
