@@ -97,7 +97,7 @@ const motivationalAtmosphere = {
   ],
 };
 
-type Phase = 'config' | 'active' | 'complete';
+type Phase = 'config' | 'warmup' | 'active' | 'complete';
 
 const WorkoutView = ({ onClose }: WorkoutViewProps) => {
   const { state, t, addSession, addReps, language, updateProfile } = useApp();
@@ -123,6 +123,7 @@ const WorkoutView = ({ onClose }: WorkoutViewProps) => {
   const [completedReps, setCompletedReps] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [showConfigInline, setShowConfigInline] = useState(false);
+  const [warmupTime, setWarmupTime] = useState(60);
 
   const voiceCoach = useVoiceCoach({
     language,
@@ -185,11 +186,41 @@ const WorkoutView = ({ onClose }: WorkoutViewProps) => {
       .filter(Boolean) as { muscle: string; text: string }[];
   }, [currentExercise, language]);
 
-  // ── Start workout ──
+  // ── Start warmup ──
   const handleStart = () => {
-    setPhase('active');
-    startTimeRef.current = Date.now();
+    setWarmupTime(60);
+    setPhase('warmup');
+    if (voiceCoachEnabled) {
+      voiceCoach.speak(language === 'es' ? '¡Calentamiento! 60 segundos.' : 'Warmup! 60 seconds.');
+    }
   };
+
+  // ── Warmup countdown ──
+  useEffect(() => {
+    if (phase !== 'warmup' || isPaused) return;
+    if (warmupTime <= 0) {
+      setPhase('active');
+      startTimeRef.current = Date.now();
+      if (voiceCoachEnabled) {
+        voiceCoach.speak(language === 'es' ? '¡Vamos! ¡A entrenar!' : "Let's go! Start training!");
+      }
+      return;
+    }
+    const timer = setTimeout(() => {
+      const next = warmupTime - 1;
+      setWarmupTime(next);
+      if (next <= 5 && next > 0 && voiceCoachEnabled) {
+        voiceCoach.speak(`${next}`);
+      }
+      if (next === 30 && voiceCoachEnabled) {
+        voiceCoach.speak(language === 'es' ? '30 segundos' : '30 seconds');
+      }
+      if (next === 10 && voiceCoachEnabled) {
+        voiceCoach.speak(language === 'es' ? '10 segundos, prepárate' : '10 seconds, get ready');
+      }
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [phase, warmupTime, isPaused, voiceCoachEnabled, voiceCoach, language]);
 
   // ── Atmosphere rotation ──
   useEffect(() => {
@@ -530,6 +561,57 @@ const WorkoutView = ({ onClose }: WorkoutViewProps) => {
           </div>
         )}
 
+        {/* ── WARMUP PHASE ── */}
+        {phase === 'warmup' && (
+          <div className="flex flex-col items-center justify-center h-full p-6 gap-6">
+            <div className="text-center">
+              <h1 className="terminal-text text-xl mb-2">
+                🔥 {language === 'es' ? 'CALENTAMIENTO' : 'WARMUP'}
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                {language === 'es' ? 'Prepara tu cuerpo para el entrenamiento' : 'Prepare your body for the workout'}
+              </p>
+            </div>
+
+            <div className="relative flex items-center justify-center">
+              <svg className="w-48 h-48 -rotate-90" viewBox="0 0 200 200">
+                <circle cx="100" cy="100" r="90" fill="none" stroke="hsl(var(--muted))" strokeWidth="6" />
+                <circle
+                  cx="100" cy="100" r="90" fill="none"
+                  stroke="hsl(var(--primary))"
+                  strokeWidth="6"
+                  strokeLinecap="round"
+                  strokeDasharray={`${2 * Math.PI * 90}`}
+                  strokeDashoffset={`${2 * Math.PI * 90 * (1 - warmupTime / 60)}`}
+                  className="transition-all duration-1000"
+                />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <div className="font-mono text-6xl font-bold text-primary">{warmupTime}</div>
+                <div className="text-xs text-muted-foreground uppercase tracking-widest mt-1">
+                  {language === 'es' ? 'segundos' : 'seconds'}
+                </div>
+              </div>
+            </div>
+
+            <div className="card-brutal p-3 w-full max-w-sm text-center">
+              <p className="text-xs text-muted-foreground mb-1">
+                {language === 'es' ? 'Primer ejercicio:' : 'First exercise:'}
+              </p>
+              <p className="font-bold text-sm">
+                {language === 'es' ? workoutExercises[0]?.nameEs : workoutExercises[0]?.name}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {workoutExercises[0]?.reps}×{workoutExercises[0]?.sets} • ~{totalRepsEstimate} {language === 'es' ? 'reps totales' : 'total reps'}
+              </p>
+            </div>
+
+            <p className="text-xs text-muted-foreground italic text-center">
+              💡 {language === 'es' ? 'Estira, mueve articulaciones, activa tu cuerpo' : 'Stretch, move joints, activate your body'}
+            </p>
+          </div>
+        )}
+
         {/* ── ACTIVE PHASE ── */}
         {phase === 'active' && (
           <div className="flex flex-col items-center p-4 gap-4">
@@ -695,6 +777,18 @@ const WorkoutView = ({ onClose }: WorkoutViewProps) => {
                 <Button onClick={handleStart} className="flex-1 h-12 btn-military">
                   <Play className="w-5 h-5 mr-2" />
                   {language === 'es' ? 'COMENZAR' : 'START'}
+                </Button>
+              </>
+            ) : phase === 'warmup' ? (
+              /* Warmup controls */
+              <>
+                <Button onClick={togglePause} variant="outline" className="flex-1 h-12 border-2">
+                  {isPaused ? <Play className="w-5 h-5 mr-2" /> : <Pause className="w-5 h-5 mr-2" />}
+                  {isPaused ? (language === 'es' ? 'CONTINUAR' : 'RESUME') : (language === 'es' ? 'PAUSA' : 'PAUSE')}
+                </Button>
+                <Button onClick={() => { setWarmupTime(0); }} className="flex-1 h-12 btn-military">
+                  <SkipForward className="w-5 h-5 mr-2" />
+                  {language === 'es' ? 'SALTAR' : 'SKIP'}
                 </Button>
               </>
             ) : isResting ? (
