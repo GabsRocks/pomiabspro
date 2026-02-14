@@ -97,7 +97,7 @@ const motivationalAtmosphere = {
   ],
 };
 
-type Phase = 'config' | 'warmup' | 'active' | 'complete';
+type Phase = 'warmup' | 'active' | 'complete';
 
 const WorkoutView = ({ onClose }: WorkoutViewProps) => {
   const { state, t, addSession, addReps, language, updateProfile } = useApp();
@@ -105,7 +105,7 @@ const WorkoutView = ({ onClose }: WorkoutViewProps) => {
   const { preferences, voiceCoachEnabled, voiceVolume = 1.0, name: userName } = profile;
 
   // ── Phase ──
-  const [phase, setPhase] = useState<Phase>('config');
+  const [phase, setPhase] = useState<Phase>('warmup');
 
   // ── Config state ──
   const [durationIdx, setDurationIdx] = useState(1);
@@ -186,14 +186,14 @@ const WorkoutView = ({ onClose }: WorkoutViewProps) => {
       .filter(Boolean) as { muscle: string; text: string }[];
   }, [currentExercise, language]);
 
-  // ── Start warmup ──
-  const handleStart = () => {
-    setWarmupTime(60);
-    setPhase('warmup');
-    if (voiceCoachEnabled) {
+  // ── Announce warmup on mount ──
+  const hasAnnouncedWarmup = useRef(false);
+  useEffect(() => {
+    if (phase === 'warmup' && !hasAnnouncedWarmup.current && voiceCoachEnabled) {
+      hasAnnouncedWarmup.current = true;
       voiceCoach.speak(language === 'es' ? '¡Calentamiento! 60 segundos.' : 'Warmup! 60 seconds.');
     }
-  };
+  }, [phase, voiceCoachEnabled, voiceCoach, language]);
 
   // ── Warmup countdown ──
   useEffect(() => {
@@ -471,95 +471,7 @@ const WorkoutView = ({ onClose }: WorkoutViewProps) => {
 
       {/* ══ MAIN CONTENT ══ */}
       <div className="flex-1 overflow-auto">
-        {/* ── CONFIG PHASE ── */}
-        {phase === 'config' && (
-          <div className="flex flex-col items-center justify-center h-full p-4 gap-6">
-            <h1 className="terminal-text text-lg text-center">
-              {language === 'es' ? '⚡ CONFIGURAR RUTINA' : '⚡ CONFIGURE WORKOUT'}
-            </h1>
-
-            {/* Chronometers side by side on larger, stacked on small */}
-            <div className="flex flex-col sm:flex-row gap-6 items-center">
-              {/* Duration chronometer */}
-              <div className="flex flex-col items-center gap-2">
-                <div className="flex items-center gap-1.5">
-                  <Clock className="w-4 h-4 text-primary" />
-                  <span className="terminal-text text-xs">{language === 'es' ? 'EJERCICIO' : 'EXERCISE'}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <button onClick={() => cycleDuration(-1)} className="p-1.5 rounded-sm border-2 border-border hover:bg-muted active:scale-95 transition-transform">
-                    <ChevronDown className="w-5 h-5 text-muted-foreground" />
-                  </button>
-                  <div className="card-brutal px-5 py-3 min-w-[140px] text-center bg-card border-primary/30">
-                    <div className="font-mono text-3xl font-bold text-primary tracking-wider">{fmtDuration(duration)}</div>
-                    <div className="text-xs text-muted-foreground mt-0.5 uppercase tracking-widest">{language === 'es' ? 'min' : 'min'}</div>
-                  </div>
-                  <button onClick={() => cycleDuration(1)} className="p-1.5 rounded-sm border-2 border-border hover:bg-muted active:scale-95 transition-transform">
-                    <ChevronUp className="w-5 h-5 text-muted-foreground" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Rest chronometer */}
-              <div className="flex flex-col items-center gap-2">
-                <div className="flex items-center gap-1.5">
-                  <Timer className="w-4 h-4 text-accent" />
-                  <span className="terminal-text text-xs">{language === 'es' ? 'DESCANSO' : 'REST'}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <button onClick={() => cycleRest(-1)} className="p-1.5 rounded-sm border-2 border-border hover:bg-muted active:scale-95 transition-transform">
-                    <ChevronDown className="w-5 h-5 text-muted-foreground" />
-                  </button>
-                  <div className="card-brutal px-5 py-3 min-w-[140px] text-center bg-card border-accent/30">
-                    <div className="font-mono text-3xl font-bold text-accent tracking-wider">{fmtRest(rest)}</div>
-                    <div className="text-xs text-muted-foreground mt-0.5 uppercase tracking-widest">{language === 'es' ? 'seg' : 'sec'}</div>
-                  </div>
-                  <button onClick={() => cycleRest(1)} className="p-1.5 rounded-sm border-2 border-border hover:bg-muted active:scale-95 transition-transform">
-                    <ChevronUp className="w-5 h-5 text-muted-foreground" />
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Summary preview */}
-            <div className="card-brutal p-3 w-full max-w-sm">
-              <div className="text-center text-muted-foreground text-xs mb-1.5">
-                {language === 'es' ? 'Tu rutina:' : 'Your workout:'}
-              </div>
-              <div className="text-center flex items-center justify-center gap-3 flex-wrap text-sm">
-                <div>
-                  <span className="font-mono text-xl font-bold text-primary">{duration}</span>
-                  <span className="text-muted-foreground text-xs ml-1">{language === 'es' ? 'min' : 'min'}</span>
-                </div>
-                <span className="text-muted-foreground">+</span>
-                <div>
-                  <span className="font-mono text-xl font-bold text-accent">{rest}</span>
-                  <span className="text-muted-foreground text-xs ml-1">{language === 'es' ? 'seg desc' : 'sec rest'}</span>
-                </div>
-                <span className="text-muted-foreground">•</span>
-                <div>
-                  <span className="font-mono text-xl font-bold text-foreground">{workoutExercises.length}</span>
-                  <span className="text-muted-foreground text-xs ml-1">{language === 'es' ? 'ejercicios' : 'exercises'}</span>
-                </div>
-              </div>
-              <div className="text-center text-xs text-muted-foreground mt-1.5">
-                ~{totalRepsEstimate} {language === 'es' ? 'repeticiones estimadas' : 'estimated reps'}
-              </div>
-            </div>
-
-            {/* Exercise preview list */}
-            <div className="w-full max-w-sm space-y-1">
-              <div className="terminal-text text-xs mb-1">{language === 'es' ? 'EJERCICIOS:' : 'EXERCISES:'}</div>
-              {workoutExercises.map((ex, i) => (
-                <div key={ex.id} className="flex items-center gap-2 text-xs px-2 py-1.5 bg-secondary/50 rounded-sm">
-                  <span className="font-mono text-muted-foreground w-5">{(i + 1).toString().padStart(2, '0')}</span>
-                  <span className="flex-1 truncate">{language === 'es' ? ex.nameEs : ex.name}</span>
-                  <span className="text-primary font-mono">{ex.reps}×{ex.sets}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* Config phase removed — goes straight to warmup */}
 
         {/* ── WARMUP PHASE ── */}
         {phase === 'warmup' && (
@@ -768,18 +680,7 @@ const WorkoutView = ({ onClose }: WorkoutViewProps) => {
       {phase !== 'complete' && (
         <div className="p-3 border-t-2 border-border">
           <div className="flex gap-2 max-w-sm mx-auto">
-            {phase === 'config' ? (
-              /* Config controls */
-              <>
-                <Button onClick={onClose} variant="outline" className="flex-1 h-12 border-2">
-                  {language === 'es' ? 'CANCELAR' : 'CANCEL'}
-                </Button>
-                <Button onClick={handleStart} className="flex-1 h-12 btn-military">
-                  <Play className="w-5 h-5 mr-2" />
-                  {language === 'es' ? 'COMENZAR' : 'START'}
-                </Button>
-              </>
-            ) : phase === 'warmup' ? (
+            {phase === 'warmup' ? (
               /* Warmup controls */
               <>
                 <Button onClick={togglePause} variant="outline" className="flex-1 h-12 border-2">
