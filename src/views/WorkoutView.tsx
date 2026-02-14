@@ -13,9 +13,11 @@ import { cn } from '@/lib/utils';
 import { useVoiceCoach } from '@/hooks/useVoiceCoach';
 import WorkoutTimer from '@/components/WorkoutTimer';
 import type { WorkoutSettings } from '@/components/WorkoutConfig';
+import { savePausedWorkout, clearPausedWorkout, PausedWorkout } from '@/lib/pausedWorkout';
 
 interface WorkoutViewProps {
   onClose: () => void;
+  resumeData?: PausedWorkout | null;
 }
 
 // ── Config options ──
@@ -99,17 +101,17 @@ const motivationalAtmosphere = {
 
 type Phase = 'warmup' | 'active' | 'complete';
 
-const WorkoutView = ({ onClose }: WorkoutViewProps) => {
+const WorkoutView = ({ onClose, resumeData }: WorkoutViewProps) => {
   const { state, t, addSession, addReps, language, updateProfile } = useApp();
   const { profile } = state;
   const { preferences, voiceCoachEnabled, voiceVolume = 1.0, name: userName } = profile;
 
-  // ── Phase ──
-  const [phase, setPhase] = useState<Phase>('warmup');
+  // ── Phase ── (skip warmup if resuming)
+  const [phase, setPhase] = useState<Phase>(resumeData ? 'active' : 'warmup');
 
   // ── Config state ──
-  const [durationIdx, setDurationIdx] = useState(1);
-  const [restIdx, setRestIdx] = useState(2);
+  const [durationIdx, setDurationIdx] = useState(resumeData?.durationIdx ?? 1);
+  const [restIdx, setRestIdx] = useState(resumeData?.restIdx ?? 2);
   const duration = durationOptions[durationIdx];
   const rest = restOptions[restIdx];
 
@@ -117,10 +119,10 @@ const WorkoutView = ({ onClose }: WorkoutViewProps) => {
   const [showPosture, setShowPosture] = useState(true);
   const [showVolumeControl, setShowVolumeControl] = useState(false);
   const [atmosphereIndex, setAtmosphereIndex] = useState(0);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(resumeData?.currentIndex ?? 0);
   const [isResting, setIsResting] = useState(false);
   const [restTime, setRestTime] = useState(0);
-  const [completedReps, setCompletedReps] = useState(0);
+  const [completedReps, setCompletedReps] = useState(resumeData?.completedReps ?? 0);
   const [isPaused, setIsPaused] = useState(false);
   const [showConfigInline, setShowConfigInline] = useState(false);
   const [warmupTime, setWarmupTime] = useState(60);
@@ -133,7 +135,7 @@ const WorkoutView = ({ onClose }: WorkoutViewProps) => {
   });
 
   const hasAnnouncedStart = useRef(false);
-  const startTimeRef = useRef<number>(0);
+  const startTimeRef = useRef<number>(resumeData ? Date.now() : 0);
 
   // Filter exercises
   const availableExercises = exercises.filter(e =>
@@ -143,6 +145,12 @@ const WorkoutView = ({ onClose }: WorkoutViewProps) => {
   );
 
   const [workoutExercises] = useState(() => {
+    if (resumeData) {
+      // Restore the exact exercise order from paused session
+      return resumeData.exerciseIds
+        .map(id => exercises.find(e => e.id === id))
+        .filter(Boolean) as typeof exercises;
+    }
     const shuffled = [...availableExercises].sort(() => Math.random() - 0.5);
     return shuffled.slice(0, 8);
   });
@@ -334,6 +342,7 @@ const WorkoutView = ({ onClose }: WorkoutViewProps) => {
   };
 
   const finishWorkout = () => {
+    clearPausedWorkout();
     setPhase('complete');
     voiceCoach.announceEnd();
     const durationMinutes = Math.round((Date.now() - startTimeRef.current) / 60000);
@@ -398,6 +407,17 @@ const WorkoutView = ({ onClose }: WorkoutViewProps) => {
 
   const handleClose = () => {
     voiceCoach.stopSpeaking();
+    // Save paused state if workout is in progress
+    if (phase === 'active' || phase === 'warmup') {
+      savePausedWorkout({
+        exerciseIds: workoutExercises.map(e => e.id),
+        currentIndex,
+        completedReps,
+        durationIdx,
+        restIdx,
+        pausedAt: new Date().toISOString(),
+      });
+    }
     onClose();
   };
 
