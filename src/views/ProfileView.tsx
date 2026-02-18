@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { Download, Trash2, Globe, User, Volume2 } from 'lucide-react';
+import { Download, Trash2, Globe, User, Volume2, VolumeX } from 'lucide-react';
+import { Slider } from '@/components/ui/slider';
 import { exportData, exportCSV } from '@/lib/store';
 
 const ProfileView = () => {
@@ -208,7 +209,7 @@ const ProfileView = () => {
 
       {/* Voice Coach */}
       <div className="card-brutal p-4 mb-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <Volume2 className="w-4 h-4 text-primary" />
             <div>
@@ -223,6 +224,23 @@ const ProfileView = () => {
             onCheckedChange={(checked) => updateProfile({ voiceCoachEnabled: checked })}
           />
         </div>
+        {profile.voiceCoachEnabled && (
+          <div className="flex items-center gap-3 pt-2 border-t border-border">
+            <VolumeX className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+            <Slider
+              value={[profile.voiceVolume ?? 1.0]}
+              onValueChange={(val) => updateProfile({ voiceVolume: val[0] })}
+              min={0}
+              max={1}
+              step={0.1}
+              className="flex-1"
+            />
+            <Volume2 className="w-3 h-3 text-primary flex-shrink-0" />
+            <span className="font-mono text-xs text-muted-foreground w-8 text-right">
+              {Math.round((profile.voiceVolume ?? 1.0) * 100)}%
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Silent Mode */}
